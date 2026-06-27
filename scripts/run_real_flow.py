@@ -17,8 +17,11 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from agents.analyzer import AnalyzerAgent
+from agents.coverage_agent import CoverageAgent
 from agents.edge_case import EdgeCaseAgent
 from agents.generator import TestGeneratorAgent
+from agents.repair import RepairAgent
+from agents.verifier import VerifierAgent
 from testflow.llm_client import flush_traces, load_env_file
 
 from run_agent_smoke import make_target_importable
@@ -36,6 +39,7 @@ def main() -> int:
     parser.add_argument("--generated-dir", default=str(DEFAULT_GENERATED_DIR), help="Folder for generated pytest files.")
     parser.add_argument("--report-dir", default=str(DEFAULT_REPORT_DIR), help="Folder for coverage reports.")
     parser.add_argument("--coverage-source", help="Coverage source root. Defaults to the target file parent folder.")
+    parser.add_argument("--coverage-target", type=float, default=80.0, help="Coverage percent target before applying CoverageAgent.")
     parser.add_argument("--no-html", action="store_true", help="Skip HTML coverage output.")
     args = parser.parse_args()
 
@@ -58,6 +62,7 @@ def main() -> int:
             generated_dir=generated_dir,
             report_dir=report_dir,
             coverage_source=Path(args.coverage_source).resolve() if args.coverage_source else target.parent,
+            coverage_target=args.coverage_target,
             html=not args.no_html,
         )
         if result != 0:
@@ -72,6 +77,7 @@ def run_target(
     generated_dir: Path,
     report_dir: Path,
     coverage_source: Path,
+    coverage_target: float,
     html: bool,
 ) -> int:
     target = target.resolve()
@@ -83,6 +89,7 @@ def run_target(
     print(f"Target: {target}", flush=True)
     print(f"Generated tests: {test_file}", flush=True)
     print(f"Coverage source: {coverage_source}", flush=True)
+    print(f"Coverage target: {coverage_target:.1f}%", flush=True)
 
     tracer = FlowTracer()
     with tracer.observation(
@@ -134,72 +141,108 @@ def run_target(
             test_file.write_text(test_code, encoding="utf-8")
             span.update(output={"test_file": str(test_file), "test_code_chars": len(test_code)})
 
-        flush_traces()
-
         print(f"Functions discovered: {len(analysis.get('functions', []))}", flush=True)
         print(f"Edge-case groups: {len(edge_cases)}", flush=True)
 
-        with tracer.observation(name="coverage-erase", as_type="tool"):
-            _run([sys.executable, "-m", "coverage", "erase"])
+        flush_traces()
+
+        erase_coverage(tracer, "coverage-erase-initial")
+        pytest_result = run_tests_with_coverage(tracer, "run-generated-tests", test_file, coverage_source)
 
         with tracer.observation(
-            name="run-generated-tests",
-            as_type="tool",
-            input={"test_file": str(test_file)},
+            name="repair-tests",
+            as_type="agent",
+            input={
+                "test_file": str(test_file),
+                "previous_returncode": pytest_result.returncode,
+                "applies_only_on_failure": True,
+            },
         ) as span:
-            pytest_result = _run(
-                [
-                    sys.executable,
-                    "-m",
-                    "coverage",
-                    "run",
-                    f"--source={coverage_source}",
-                    "-m",
-                    "pytest",
-                    str(test_file),
-                    "-q",
-                ]
+            current_test_code = test_file.read_text(encoding="utf-8")
+            repaired_test_code = RepairAgent().run(
+                {
+                    "source_code": analysis.get("source", ""),
+                    "current_test_code": current_test_code,
+                    "pytest_stdout": pytest_result.stdout,
+                    "pytest_stderr": pytest_result.stderr,
+                    "traceback": pytest_result.stderr or pytest_result.stdout,
+                }
             )
+            repaired_test_code = make_target_importable(repaired_test_code, target)
+            repair_applied = pytest_result.returncode != 0
+            if repair_applied:
+                test_file.write_text(repaired_test_code, encoding="utf-8")
             span.update(
                 output={
-                    "returncode": pytest_result.returncode,
-                    "stdout": pytest_result.stdout[-2000:],
-                    "stderr": pytest_result.stderr[-2000:],
+                    "applied": repair_applied,
+                    "candidate_chars": len(repaired_test_code),
+                    "reason": "pytest_failed" if repair_applied else "pytest_already_passing",
                 },
-                level="ERROR" if pytest_result.returncode else "DEFAULT",
             )
+        flush_traces()
+
+        if repair_applied:
+            erase_coverage(tracer, "coverage-erase-after-repair")
+            pytest_result = run_tests_with_coverage(tracer, "run-repaired-tests", test_file, coverage_source)
+
+        report_result, coverage_percent = measure_coverage(tracer, "measure-coverage", target)
 
         with tracer.observation(
-            name="measure-coverage",
-            as_type="evaluator",
-            input={"target": str(target)},
+            name="improve-coverage",
+            as_type="agent",
+            input={
+                "target": str(target),
+                "coverage_percent": coverage_percent,
+                "coverage_target": coverage_target,
+                "applies_only_below_target": True,
+            },
         ) as span:
-            report_result = _run([sys.executable, "-m", "coverage", "report", "-m", str(target)])
-            coverage_percent = _coverage_percent(report_result.stdout, target)
+            current_test_code = test_file.read_text(encoding="utf-8")
+            coverage_test_code = CoverageAgent().run(
+                {
+                    "source_code": analysis.get("source", ""),
+                    "current_tests": current_test_code,
+                    "current_coverage": report_result.stdout,
+                    "coverage": coverage_percent,
+                }
+            )
+            coverage_test_code = make_target_importable(coverage_test_code, target)
+            coverage_applied = pytest_result.returncode == 0 and coverage_percent < coverage_target
+            if coverage_applied:
+                test_file.write_text(coverage_test_code, encoding="utf-8")
             span.update(
                 output={
-                    "returncode": report_result.returncode,
+                    "applied": coverage_applied,
+                    "candidate_chars": len(coverage_test_code),
                     "coverage_percent": coverage_percent,
-                    "stdout": report_result.stdout,
-                    "stderr": report_result.stderr,
+                    "coverage_target": coverage_target,
+                    "reason": "coverage_below_target" if coverage_applied else "coverage_target_met_or_tests_failed",
                 },
-                level="ERROR" if report_result.returncode else "DEFAULT",
             )
+        flush_traces()
 
-        with tracer.observation(name="write-coverage-artifacts", as_type="tool") as span:
-            xml_result = _run([sys.executable, "-m", "coverage", "xml", "-o", str(xml_file)])
-            html_result = None
-            if html:
-                html_result = _run([sys.executable, "-m", "coverage", "html", "-d", str(html_dir)])
+        if coverage_applied:
+            erase_coverage(tracer, "coverage-erase-after-coverage-agent")
+            pytest_result = run_tests_with_coverage(tracer, "run-coverage-expanded-tests", test_file, coverage_source)
+            report_result, coverage_percent = measure_coverage(tracer, "measure-coverage-after-coverage-agent", target)
+
+        with tracer.observation(
+            name="verify-tests",
+            as_type="agent",
+            input={"test_file": str(test_file), "pytest_returncode": pytest_result.returncode, "coverage_percent": coverage_percent},
+        ) as span:
+            verification = VerifierAgent().run({"test_code": test_file.read_text(encoding="utf-8")})
             span.update(
                 output={
-                    "xml_file": str(xml_file),
-                    "html_file": str(html_dir / "index.html") if html else "",
-                    "xml_returncode": xml_result.returncode,
-                    "html_returncode": html_result.returncode if html_result else None,
+                    "ok": verification.get("ok"),
+                    "issue_count": len(verification.get("issues", [])),
+                    "test_count": verification.get("test_count", 0),
+                    "issues": verification.get("issues", [])[:10],
                 },
-                level="ERROR" if xml_result.returncode or (html_result and html_result.returncode) else "DEFAULT",
+                level="WARNING" if not verification.get("ok") else "DEFAULT",
             )
+
+        xml_result, html_result = write_coverage_artifacts(tracer, xml_file, html_dir, html)
 
         flow.update(
             output={
@@ -207,10 +250,14 @@ def run_target(
                 "test_file": str(test_file),
                 "pytest_returncode": pytest_result.returncode,
                 "coverage_percent": coverage_percent,
+                "coverage_target": coverage_target,
                 "coverage_xml": str(xml_file),
                 "coverage_html": str(html_dir / "index.html") if html else "",
+                "repair_applied": repair_applied,
+                "coverage_agent_applied": coverage_applied,
+                "verifier_ok": verification.get("ok"),
             },
-            level="ERROR" if pytest_result.returncode or report_result.returncode else "DEFAULT",
+            level="ERROR" if pytest_result.returncode or report_result.returncode or xml_result.returncode else "DEFAULT",
         )
 
     tracer.flush()
@@ -247,6 +294,89 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     if result.stderr:
         print(result.stderr.rstrip(), file=sys.stderr, flush=True)
     return result
+
+
+def erase_coverage(tracer: "FlowTracer", name: str) -> subprocess.CompletedProcess[str]:
+    with tracer.observation(name=name, as_type="tool"):
+        return _run([sys.executable, "-m", "coverage", "erase"])
+
+
+def run_tests_with_coverage(
+    tracer: "FlowTracer",
+    name: str,
+    test_file: Path,
+    coverage_source: Path,
+) -> subprocess.CompletedProcess[str]:
+    with tracer.observation(
+        name=name,
+        as_type="tool",
+        input={"test_file": str(test_file), "coverage_source": str(coverage_source)},
+    ) as span:
+        result = _run(
+            [
+                sys.executable,
+                "-m",
+                "coverage",
+                "run",
+                f"--source={coverage_source}",
+                "-m",
+                "pytest",
+                str(test_file),
+                "-q",
+            ]
+        )
+        span.update(
+            output={
+                "returncode": result.returncode,
+                "stdout": result.stdout[-2000:],
+                "stderr": result.stderr[-2000:],
+            },
+            level="ERROR" if result.returncode else "DEFAULT",
+        )
+        return result
+
+
+def measure_coverage(
+    tracer: "FlowTracer",
+    name: str,
+    target: Path,
+) -> tuple[subprocess.CompletedProcess[str], float]:
+    with tracer.observation(name=name, as_type="evaluator", input={"target": str(target)}) as span:
+        result = _run([sys.executable, "-m", "coverage", "report", "-m", str(target)])
+        coverage_percent = _coverage_percent(result.stdout, target)
+        span.update(
+            output={
+                "returncode": result.returncode,
+                "coverage_percent": coverage_percent,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+            },
+            level="ERROR" if result.returncode else "DEFAULT",
+        )
+        return result, coverage_percent
+
+
+def write_coverage_artifacts(
+    tracer: "FlowTracer",
+    xml_file: Path,
+    html_dir: Path,
+    html: bool,
+) -> tuple[subprocess.CompletedProcess[str], subprocess.CompletedProcess[str] | None]:
+    with tracer.observation(name="write-coverage-artifacts", as_type="tool") as span:
+        xml_result = _run([sys.executable, "-m", "coverage", "xml", "-o", str(xml_file)])
+        html_result = None
+        if html:
+            html_result = _run([sys.executable, "-m", "coverage", "html", "-d", str(html_dir)])
+        span.update(
+            output={
+                "xml_file": str(xml_file),
+                "html_file": str(html_dir / "index.html") if html else "",
+                "xml_returncode": xml_result.returncode,
+                "html_returncode": html_result.returncode if html_result else None,
+            },
+            level="ERROR" if xml_result.returncode or (html_result and html_result.returncode) else "DEFAULT",
+        )
+        return xml_result, html_result
 
 
 def _coverage_percent(stdout: str, target: Path) -> float:

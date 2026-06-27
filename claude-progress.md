@@ -149,6 +149,27 @@
   - Langfuse API check for trace `037b6b3c7eb766624afdb1c40fd83e17` -> trace name `testflow-real-flow`, 9 observations, including `CHAIN`, `AGENT`, `GENERATION`, `TOOL`, and `EVALUATOR`; generation is parented under the generate-tests agent observation.
   - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
 
+## Session 009 - 2026-06-27
+
+- Goal: wire the remaining agents into the real demo flow so Langfuse shows a full six-agent run.
+- Completed:
+  - Updated `scripts/run_real_flow.py` to call all six root agents:
+    - `AnalyzerAgent`
+    - `EdgeCaseAgent`
+    - `TestGeneratorAgent`
+    - `RepairAgent`
+    - `CoverageAgent`
+    - `VerifierAgent`
+  - Repair and coverage agents always appear in the trace for demo completeness, but their generated candidates are only applied when tests fail or coverage is below target.
+  - Added `--coverage-target` to `scripts/run_real_flow.py`.
+  - Updated README to describe the full six-agent trace.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 8 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m py_compile scripts\run_real_flow.py` -> pass.
+  - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_real_flow.py --target examples\string_utils.py` -> exit 0, 12 generated tests passed, coverage 100%, and printed current trace URL `https://cloud.langfuse.com/project/cmqw0y8yq0362ad0dxk71tbeo/traces/e0b4d251ab865c6b2c0964bcaa3bdff5`.
+  - Langfuse API check for trace `e0b4d251ab865c6b2c0964bcaa3bdff5` -> trace name `testflow-real-flow`, 14 observations, types `AGENT: 6`, `GENERATION: 3`, `TOOL: 3`, `EVALUATOR: 1`, `CHAIN: 1`.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+
 ## Next Best Step
 
 Finish `tf-001`: add `pyproject.toml` and an installable console entry point so `.venv` can run `testflow --help` and eventually `testflow run ...`.
