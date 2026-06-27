@@ -63,3 +63,21 @@
 - Blocker:
   - Python trong `.venv` cần chạy ngoài sandbox nếu command cần truy cập base interpreter dưới `C:\Users`.
   - Bash path vẫn cần WSL distro thật để xác minh.
+### Phien 003 - 2026-06-27
+
+- Muc tieu: Doc lai repo sau merge `be46f33 Merge branch 'ttrinh' into hautt` va dong bo runtime/demo voi code moi.
+- Da hoan thanh:
+  - Xac nhan baseline Windows trong `.venv` van pass 7 tests.
+  - Dong bo runtime de ghi generated tests vao root `generated_tests/test_<module>.py`, khop README/demo docs va `generated_tests/.gitkeep`.
+  - Mo rong fallback coverage generation bang cac case so hoc an toan cho target demo moi `examples/calculator.py`.
+  - Sua `coverage_utils.run_coverage` de uu tien line coverage cua dung target file thay vi root coverage cua ca thu muc `examples`.
+  - Don artifact generated bi track sai: `.testflow/final_summary.json` va `examples/generated_tests/test_calculator.py`; cap nhat `.gitignore` cho `.testflow/` va nested generated tests.
+  - Cap nhat README, docs demo, feature baseline, va handoff theo command hien tai.
+- Xac minh da chay:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass; 7 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 7 passed.
+  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0; pass rate 100%; target-file coverage 100%; generated file `generated_tests/test_calculator.py`.
+  - `bash ./init.sh` -> van fail vi WSL chua co installed distro.
+- Trang thai hien tai:
+  - Demo command dung hien tai: `python main.py --target examples/calculator.py`.
+  - Chua co installable CLI/console script `testflow run`; `tf-001` van chua passing cho den khi co `pyproject.toml`.

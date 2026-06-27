@@ -9,7 +9,7 @@ This demo proves the full loop: generation -> execution -> repair -> coverage ex
 ## 2. Setup
 
 ```bash
-pip install -r requirements.txt
+powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1
 ```
 
 ## 3. Main Demo Command
@@ -23,17 +23,16 @@ python main.py --target examples/calculator.py
 ```text
 ========== TestFlow Report ==========
 Target: examples/calculator.py
-Functions found: 5
-Actions taken:
+Generated test file: generated_tests/test_calculator.py
+Actions:
 - analyze
 - generate_tests
 - run_tests
-- repair_failed_tests
 - measure_coverage
 - generate_missing_tests
 Final pass rate: 100%
-Final coverage: 80%+
-Generated tests: generated_tests/test_calculator.py
+Final coverage: 100%
+Status: completed
 ====================================
 ```
 
@@ -57,7 +56,7 @@ Generated tests: generated_tests/test_calculator.py
 - `generated_tests/test_calculator.py`
 - `testflow/orchestrator.py`
 - `testflow/runner.py`
-- `coverage.xml` or `final_summary.json` if available
+- `coverage.xml` or `.testflow/final_summary.json` if available
 
 ## 7. Backup Plan
 

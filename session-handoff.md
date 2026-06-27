@@ -1,57 +1,40 @@
-# Bàn giao Phiên
+# Session Handoff
 
-## Đang Hoạt động Hiện tại
+## Current Working State
 
-- Những gì đang hoạt động:
-  - `README.md` mô tả rõ TestFlow là execution-guided unit test orchestrator.
-  - Bộ artifact quy trình đã được chuyển sang TestFlow và có bản canonical không hậu tố.
-  - `feature_list.json` đã có roadmap MVP từ `ops-001` đến `tf-008`.
-- Xác minh nào thực sự đã chạy:
-  - `pwd` xác nhận root là `D:\TestFlow`.
-  - `git -c safe.directory=D:/TestFlow log --oneline -5` đọc được commit gần nhất.
-  - Bash baseline đã thử nhưng thất bại vì WSL chưa cài distro.
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` chạy ngoài sandbox bằng `.venv` và pass; `tests/test_state.py` pass.
+- Repo root: `D:\TestFlow`.
+- Runtime demo command: `python main.py --target examples/calculator.py`.
+- Windows baseline command: `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1`.
+- Bash baseline command: `./init.sh`, currently blocked on this machine because WSL has no installed distro.
+- Python commands should run through `.venv`; in Codex sandbox, `.venv` Python needs escalation because its base interpreter is under `C:\Users`.
 
-## Thay đổi Trong Phiên này
+## Runtime Engine Status
 
-- Mã hoặc hành vi đã thêm:
-  - Không thêm implementation TestFlow.
-  - Thêm/cập nhật baseline script `init.ps1` và `init.sh`; các script hiện bắt buộc chạy Python qua `.venv`.
-- Thay đổi cơ sở hạ tầng hoặc harness:
-  - Chuẩn hóa artifact không hậu tố: `claude-progress.md`, `feature_list.json`, `CLAUDE.md`, `clean-state-checklist.md`, `evaluator-rubric.md`, `quality-document.md`, `session-handoff.md`, `init.sh`.
-  - Xoá các file trùng có hậu tố ` (1)`; bản canonical không hậu tố là nguồn sự thật.
+- Implemented runtime files:
+  - `main.py`
+  - `testflow/state.py`
+  - `testflow/runner.py`
+  - `testflow/coverage_utils.py`
+  - `testflow/orchestrator.py`
+- Demo target: `examples/calculator.py`.
+- Generated tests are written to root `generated_tests/test_<module>.py`.
+- Final report JSON is written to `.testflow/final_summary.json`.
+- `.testflow/` and generated test files are ignored so live demos do not dirty the repo.
 
-## Bị Hỏng hoặc Chưa được Xác minh
+## Verified Commands
 
-- Lỗi đã biết:
-  - Repo chưa có Python package/CLI, agents đầy đủ, hoặc examples. Đã có `testflow/state.py` và smoke test `tests/test_state.py`.
-  - Bash path chưa xác minh được trong sandbox này vì `bash` gọi WSL và WSL chưa có distro.
-  - Git báo dubious ownership nếu không dùng `-c safe.directory=D:/TestFlow`.
-- Đường dẫn chưa được xác minh:
-  - `./init.sh` trong môi trường Bash thật.
-  - Bất kỳ command README nào như `testflow run ...` hoặc package install editable vì CLI/package chưa tồn tại.
-- Rủi ro cho phiên tiếp theo:
-  - Đừng đánh dấu feature product nào `passing` cho đến khi có code và test thật.
-  - Khi Codex chạy Python trong `.venv`, cần chạy ngoài sandbox nếu command phải truy cập base interpreter dưới `C:\Users`.
-  - Khi tạo package Python, tiếp tục dùng baseline `.venv`; không chạy `pip`, `pytest`, hoặc `testflow` từ môi trường global.
-  - Thay đổi tài liệu hiện chưa có commit vì sandbox không cho ghi `.git/index.lock` và escalation để `git add` bị từ chối.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` -> pass, 7 tests.
+- `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 7 passed.
+- `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0, pass rate 100%, target-file coverage 100%, generated file `generated_tests/test_calculator.py`.
+- `bash ./init.sh` -> fails because WSL has no installed distro.
 
-## Bước Tốt nhất Tiếp theo
+## Known Gaps
 
-- Tính năng chưa hoàn thành có mức ưu tiên cao nhất: `tf-001` - Create installable Python CLI skeleton.
-- Tại sao đây là tính năng tiếp theo: mọi feature TestFlow khác phụ thuộc vào package/CLI và test harness.
-- Điều gì được tính là vượt qua:
-  - Có `pyproject.toml`, `src/testflow/`, entry point `testflow`.
-  - `.venv` TestFlow executable `--help` chạy được.
-  - Có tests tối thiểu cho CLI.
-  - `init.ps1` và `init.sh` chạy install/test thật.
-- Điều gì không được thay đổi trong bước đó:
-  - Không làm yếu process docs hoặc bỏ yêu cầu bằng chứng.
-  - Không triển khai LLM generation trước khi có CLI/state nền.
+- No `pyproject.toml` yet.
+- No installable console script yet; do not use `testflow run` until `tf-001` is completed.
+- Agent layer remains teammate-owned. The orchestrator uses deterministic fallbacks when agent imports are unavailable.
+- Coverage currently reports target-file line coverage, not whole-example-directory coverage.
 
-## Lệnh
+## Recommended Next Step
 
-- Khởi động Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1`
-- Khởi động Bash: `./init.sh`
-- Xem Git trong sandbox: `git -c safe.directory=D:/TestFlow status --short`
-- Debug tập trung kế tiếp: sau `tf-001`, dùng `.\.venv\Scripts\python.exe -m pytest tests/` và `.\.venv\Scripts\testflow.exe --help` trên Windows; dùng `.venv/bin/python -m pytest tests/` và `.venv/bin/testflow --help` trên Bash.
+Finish `tf-001`: add an installable Python package skeleton and console entry point so `testflow --help` and eventually `testflow run ...` work from `.venv`.

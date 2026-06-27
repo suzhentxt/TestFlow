@@ -25,7 +25,9 @@ def run_coverage(target_file: str, test_file: str, cwd: str | None = None) -> di
         fallback = _run_coverage_py(test_path, target_path, working_dir, xml_path)
         result = _combine_results(result, fallback)
 
-    coverage = _parse_line_rate(xml_path)
+    coverage = _parse_target_line_rate(xml_path, target_path)
+    if coverage is None:
+        coverage = _parse_line_rate(xml_path)
     if coverage is None:
         coverage = 0.0
 
@@ -133,6 +135,44 @@ def _parse_line_rate(xml_path: Path) -> float | None:
         return _normalize_coverage(root.attrib.get("line-rate"))
     except (ET.ParseError, OSError):
         return None
+
+
+def _parse_target_line_rate(xml_path: Path, target_path: Path) -> float | None:
+    if not xml_path.exists():
+        return None
+
+    try:
+        root = ET.parse(xml_path).getroot()
+    except (ET.ParseError, OSError):
+        return None
+
+    target_names = _target_xml_filenames(root, target_path)
+    for class_node in root.findall(".//class"):
+        filename = _normalize_xml_path(class_node.attrib.get("filename", ""))
+        if filename in target_names:
+            return _normalize_coverage(class_node.attrib.get("line-rate"))
+
+    return None
+
+
+def _target_xml_filenames(root: ET.Element, target_path: Path) -> set[str]:
+    names = {_normalize_xml_path(target_path.name)}
+
+    for source_node in root.findall(".//source"):
+        source_text = source_node.text or ""
+        if not source_text:
+            continue
+        try:
+            relative = target_path.relative_to(Path(source_text).resolve())
+        except ValueError:
+            continue
+        names.add(_normalize_xml_path(str(relative)))
+
+    return names
+
+
+def _normalize_xml_path(value: str) -> str:
+    return value.replace("\\", "/")
 
 
 def _normalize_coverage(value: str | None) -> float:

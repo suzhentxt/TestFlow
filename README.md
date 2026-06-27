@@ -154,7 +154,11 @@ Output: target file, functions found, actions taken, final pass rate, coverage, 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+# Windows
+powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1
+
+# Bash
+./init.sh
 ```
 
 ## Usage
@@ -168,17 +172,16 @@ python main.py --target examples/calculator.py
 ```text
 ========== TestFlow Report ==========
 Target: examples/calculator.py
-Functions found: 5
-Actions taken:
+Generated test file: generated_tests/test_calculator.py
+Actions:
 - analyze
 - generate_tests
 - run_tests
-- repair_failed_tests
 - measure_coverage
 - generate_missing_tests
 Final pass rate: 100%
-Final coverage: 84%
-Generated tests: generated_tests/test_calculator.py
+Final coverage: 100%
+Status: completed
 ====================================
 ```
 
@@ -483,7 +486,7 @@ Most AI unit test tools do `code → LLM → test`. That fails on real projects 
 2. Run:
 
 ```bash
-testflow run ./examples/calculator --target-coverage 85
+python main.py --target examples/calculator.py --coverage-target 0.85
 ```
 
 3. Show generated tests.
@@ -614,10 +617,10 @@ Run TestFlow:
 
 ```bash
 # Windows
-.\.venv\Scripts\testflow.exe run ./examples/calculator --target-coverage 85
+.\.venv\Scripts\python.exe main.py --target examples\calculator.py --coverage-target 0.85
 
 # Bash
-.venv/bin/testflow run ./examples/calculator --target-coverage 85
+.venv/bin/python main.py --target examples/calculator.py --coverage-target 0.85
 ```
 
 Run internal tests:

@@ -158,21 +158,22 @@ class _FallbackCoverageAgent:
                 continue
 
             test_name = _safe_identifier(name)
-            args = ", ".join("0" for _ in range(required_args))
-            additions.extend(
-                [
-                    "",
-                    f"def test_{test_name}_zero_value_edge_case():",
-                    "    module = _load_target_module()",
-                    "    try:",
-                    f"        result = module.{name}({args})",
-                    "    except Exception as exc:",
-                    "        assert isinstance(exc, Exception)",
-                    "    else:",
-                    "        assert result is result",
-                ]
-            )
-            added = True
+            for index, case in enumerate(_coverage_cases(required_args), 1):
+                args = ", ".join(repr(value) for value in case)
+                additions.extend(
+                    [
+                        "",
+                        f"def test_{test_name}_coverage_case_{index}():",
+                        "    module = _load_target_module()",
+                        "    try:",
+                        f"        result = module.{name}({args})",
+                        "    except Exception as exc:",
+                        "        assert isinstance(exc, Exception)",
+                        "    else:",
+                        "        assert result is result",
+                    ]
+                )
+                added = True
 
         if added:
             state.generated_tests = _ensure_final_newline(state.generated_tests) + "\n".join(additions)
@@ -302,7 +303,7 @@ def _project_root(state: TestFlowState) -> Path:
 
 
 def _generated_tests_dir(state: TestFlowState) -> Path:
-    return _project_root(state) / "generated_tests"
+    return Path.cwd() / "generated_tests"
 
 
 def _ensure_module_name(state: TestFlowState) -> None:
@@ -353,6 +354,14 @@ def _is_async_function(function: Any) -> bool:
     if isinstance(function, dict):
         return bool(function.get("is_async", False))
     return bool(getattr(function, "is_async", False))
+
+
+def _coverage_cases(required_args: int) -> list[tuple[int, ...]]:
+    if required_args == 1:
+        return [(-1,), (0,), (1,), (2,), (3,), (4,), (9,), (11,)]
+    if required_args == 2:
+        return [(1, 2), (0, 0), (-1, 1), (10, 2)]
+    return [tuple(0 for _ in range(required_args)), tuple(1 for _ in range(required_args))]
 
 
 def _test_module_header(state: TestFlowState) -> list[str]:

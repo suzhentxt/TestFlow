@@ -24,7 +24,7 @@
     "windows_command": "powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1",
     "bash_command": "./init.sh",
     "scope": "Repository-process validation plus .venv dependency and test execution whenever Python is available.",
-    "last_result": "2026-06-27: init.ps1 passed outside the sandbox using D:\\TestFlow\\.venv; dependencies were installed in .venv and tests/test_state.py passed. Inside the default sandbox, .venv Python cannot access its base interpreter under C:\\Users. Bash remains blocked because WSL has no installed distro."
+    "last_result": "2026-06-27: init.ps1 passed outside the sandbox using D:\\TestFlow\\.venv; dependencies were installed in .venv and the full runtime test suite passed with 7 tests. Demo command `python main.py --target examples/calculator.py` exited 0, wrote generated_tests/test_calculator.py, and reported 100% pass rate / 100% target-file coverage. Inside the default sandbox, .venv Python cannot access its base interpreter under C:\\Users. Bash remains blocked because WSL has no installed distro."
   },
   "features": [
     {
@@ -62,7 +62,7 @@
         "Run .venv Python -m pytest tests/."
       ],
       "evidence": [],
-      "notes": "First product implementation feature after the documentation baseline."
+      "notes": "Partially implemented by main.py demo CLI. Still not passing for this feature because there is no pyproject.toml or installable console script named testflow yet."
     },
     {
       "id": "tf-002",

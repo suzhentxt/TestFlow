@@ -4,9 +4,11 @@ __pycache__/
 .coverage
 coverage.xml
 htmlcov/
+.testflow/
 .env
 .venv/
 venv/
 .DS_Store
 generated_tests/*.py
+**/generated_tests/*.py
 !generated_tests/.gitkeep
