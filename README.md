@@ -6,6 +6,27 @@ Track 2: Engineering Depth
 
 TestFlow generates unit tests, runs them with pytest, observes real execution feedback, repairs failures from traceback output, measures coverage, and generates additional tests when coverage or behavior coverage is low. The goal is not to wrap an LLM call. The goal is to build a runtime system where execution results control the next step.
 
+## Live App
+
+App URL: https://<your-streamlit-subdomain>.streamlit.app
+
+The Streamlit app provides a visual demo of the execution-guided loop. It supports:
+
+- Demo Mode: deterministic, reliable for public judging
+- Live Run: invokes the CLI when supported
+
+Run the UI locally:
+
+```bash
+streamlit run ui/app.py
+```
+
+CLI fallback:
+
+```bash
+python main.py --target examples/calculator.py
+```
+
 ## Why TestFlow?
 
 Most tools do:

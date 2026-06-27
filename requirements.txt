@@ -2,3 +2,4 @@ pytest
 coverage
 openai
 langfuse>=3.0.0
+streamlit
