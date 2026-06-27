@@ -7,8 +7,9 @@ import os
 import re
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 def load_env_file(path: str = ".env") -> None:
@@ -136,6 +137,8 @@ class _LangfuseTracer:
         self.enabled = _truthy(os.getenv("LANGFUSE_ENABLED", "true"))
         if not self.enabled:
             return
+        if os.getenv("PYTEST_CURRENT_TEST") and not _truthy(os.getenv("TESTFLOW_TRACE_PYTEST", "false")):
+            return
         public_key = _env_secret("LANGFUSE_PUBLIC_KEY")
         secret_key = _env_secret("LANGFUSE_SECRET_KEY")
         if not public_key or not secret_key:
@@ -176,9 +179,8 @@ class _LangfuseTracer:
         trace_output = _trace_payload(output, "output")
 
         try:
-            with self.client.start_as_current_observation(
+            with self.client.start_as_current_generation(
                 name="llm-client-generate",
-                as_type="generation",
                 model=model,
                 input=trace_input,
                 output=trace_output,
@@ -186,7 +188,86 @@ class _LangfuseTracer:
                 level="ERROR" if error else "DEFAULT",
                 status_message=error or None,
             ):
-                self.client.set_current_trace_io(input=trace_input, output=trace_output)
+                self.client.update_current_trace(
+                    name="TestFlow LLM Generation",
+                    input=trace_input,
+                    output=trace_output,
+                    metadata=metadata,
+                    tags=["testflow", "llm"],
+                )
+        except Exception:
+            return
+
+    @contextmanager
+    def span(
+        self,
+        *,
+        name: str,
+        input_data: Any = None,
+        output_data: Any = None,
+        metadata: dict[str, Any] | None = None,
+        level: str | None = None,
+        status_message: str | None = None,
+    ) -> Iterator[None]:
+        """Create a Langfuse span when tracing is configured."""
+        if self.client is None:
+            yield
+            return
+
+        try:
+            with self.client.start_as_current_span(
+                name=name,
+                input=input_data,
+                output=output_data,
+                metadata=metadata,
+                level=level,
+                status_message=status_message,
+            ):
+                yield
+        except Exception:
+            yield
+
+    def update_current_trace(
+        self,
+        *,
+        name: str | None = None,
+        input_data: Any = None,
+        output_data: Any = None,
+        metadata: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
+        """Update the active trace if one exists."""
+        if self.client is None:
+            return
+        try:
+            self.client.update_current_trace(
+                name=name,
+                input=input_data,
+                output=output_data,
+                metadata=metadata,
+                tags=tags,
+            )
+        except Exception:
+            return
+
+    def update_current_span(
+        self,
+        *,
+        output_data: Any = None,
+        metadata: dict[str, Any] | None = None,
+        level: str | None = None,
+        status_message: str | None = None,
+    ) -> None:
+        """Update the active span if one exists."""
+        if self.client is None:
+            return
+        try:
+            self.client.update_current_span(
+                output=output_data,
+                metadata=metadata,
+                level=level,
+                status_message=status_message,
+            )
         except Exception:
             return
 
@@ -205,6 +286,62 @@ _TRACER: _LangfuseTracer | None = None
 def flush_traces() -> None:
     """Flush pending Langfuse traces for short-lived CLI runs."""
     _get_tracer().flush()
+
+
+@contextmanager
+def trace_span(
+    name: str,
+    *,
+    input_data: Any = None,
+    output_data: Any = None,
+    metadata: dict[str, Any] | None = None,
+    level: str | None = None,
+    status_message: str | None = None,
+) -> Iterator[None]:
+    """Create a Langfuse span if Langfuse is configured."""
+    with _get_tracer().span(
+        name=name,
+        input_data=input_data,
+        output_data=output_data,
+        metadata=metadata,
+        level=level,
+        status_message=status_message,
+    ):
+        yield
+
+
+def update_current_trace(
+    *,
+    name: str | None = None,
+    input_data: Any = None,
+    output_data: Any = None,
+    metadata: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+) -> None:
+    """Update the active Langfuse trace if one exists."""
+    _get_tracer().update_current_trace(
+        name=name,
+        input_data=input_data,
+        output_data=output_data,
+        metadata=metadata,
+        tags=tags,
+    )
+
+
+def update_current_span(
+    *,
+    output_data: Any = None,
+    metadata: dict[str, Any] | None = None,
+    level: str | None = None,
+    status_message: str | None = None,
+) -> None:
+    """Update the active Langfuse span if one exists."""
+    _get_tracer().update_current_span(
+        output_data=output_data,
+        metadata=metadata,
+        level=level,
+        status_message=status_message,
+    )
 
 
 def _trace_llm_generation(

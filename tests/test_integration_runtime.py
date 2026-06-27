@@ -30,7 +30,8 @@ def test_run_testflow_generates_and_runs_tests_for_tmp_project(tmp_path):
     assert final_state.generated_tests
     assert final_state.pass_rate >= 0.0
     assert final_state.coverage >= 0.0
-    assert any(action.startswith("run_pytest") for action in final_state.actions_taken)
+    assert "run_tests" in final_state.actions_taken
+    assert final_state.decision_trace
 
 
 def test_main_cli_runs_without_crashing_for_tmp_project(tmp_path):
@@ -47,7 +48,7 @@ def test_main_cli_runs_without_crashing_for_tmp_project(tmp_path):
             "--coverage-target",
             "0.0",
             "--max-iterations",
-            "3",
+            "8",
         ],
         cwd=str(tmp_path),
         capture_output=True,
@@ -58,6 +59,7 @@ def test_main_cli_runs_without_crashing_for_tmp_project(tmp_path):
 
     assert result.returncode == 0
     assert "TestFlow Runtime Summary" in result.stdout
+    assert "Decision trace:" in result.stdout
     assert "Traceback" not in result.stderr
     assert (tmp_path / ".testflow" / "final_summary.json").is_file()
 

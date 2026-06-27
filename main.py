@@ -15,7 +15,14 @@ from testflow.state import TestFlowState
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run TestFlow on a target Python file.")
     parser.add_argument("--target", required=True, help="Path to the target Python file.")
-    parser.add_argument("--coverage-target", type=float, default=0.8, help="Target line coverage from 0.0 to 1.0.")
+    parser.add_argument(
+        "--coverage-threshold",
+        "--coverage-target",
+        dest="coverage_threshold",
+        type=float,
+        default=0.8,
+        help="Target line coverage from 0.0 to 1.0.",
+    )
     parser.add_argument("--max-iterations", type=int, default=8, help="Maximum pytest iterations.")
     args = parser.parse_args(argv)
 
@@ -27,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     state = TestFlowState(
         target_file=str(target_path.resolve()),
         module_name=target_path.stem,
-        coverage_target=args.coverage_target,
+        coverage_threshold=args.coverage_threshold,
         max_iterations=args.max_iterations,
     )
     final_state = run_testflow(state)
@@ -38,10 +45,11 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = Path(".testflow")
     output_dir.mkdir(parents=True, exist_ok=True)
     summary_path = output_dir / "final_summary.json"
-    summary_data = final_state.report_dict()
+    summary_data = final_state.to_summary_dict()
     summary_data["summary_text"] = summary
     summary_data["raw_state"] = final_state.to_dict()
     summary_path.write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
+    Path("final_summary.json").write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
     flush_traces()
 
     return 0 if final_state.pass_rate == 1.0 else 1

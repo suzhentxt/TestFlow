@@ -5,6 +5,7 @@ __pycache__/
 coverage.xml
 htmlcov/
 .testflow/
+final_summary.json
 .env
 .venv/
 venv/

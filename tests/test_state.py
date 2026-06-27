@@ -21,4 +21,4 @@ def test_state_defaults_actions_dict_and_summary():
 
     assert "TestFlow Runtime Summary" in summary
     assert "2 passed, 1 failed, 0 errors, 3 total" in summary
-    assert "1. RunTests" in summary
+    assert "Decision trace:" in summary
