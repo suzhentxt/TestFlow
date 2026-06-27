@@ -340,7 +340,15 @@ action.generate_tests
 action.run_tests
 action.measure_coverage
 action.verify_tests
+orchestrator.graph
 ```
+
+The `orchestrator.graph` span and final trace output include:
+
+- `graph.nodes`: runtime state and action nodes
+- `graph.edges`: planner decision and state update edges
+- `graph.mermaid`: Mermaid text for the state/action graph
+- `graph.timeline`: compact `from -> action -> to` transitions
 
 The direct agent smoke script can exercise the OpenAI-backed generator:
 

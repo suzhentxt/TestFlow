@@ -148,6 +148,7 @@ class TestFlowOrchestrator:
                     "status_before": status_before,
                     "action": action.value,
                     "reason": reason,
+                    "metrics_before": _trace_metrics(state),
                 }
 
                 with trace_span(
@@ -169,6 +170,8 @@ class TestFlowOrchestrator:
                     state.stop_reason = reason
                     if state.status != "success":
                         state.status = "stopped"
+                    state.decision_trace[-1]["status_after"] = state.status
+                    state.decision_trace[-1]["metrics_after"] = _trace_metrics(state)
                     break
 
                 agent = self.agents[action]
@@ -193,6 +196,8 @@ class TestFlowOrchestrator:
 
                 state.add_action(action)
                 state.iterations += 1
+                state.decision_trace[-1]["status_after"] = state.status
+                state.decision_trace[-1]["metrics_after"] = _trace_metrics(state)
 
                 if state.status == "success":
                     state.stop_reason = "verified successfully"
@@ -201,16 +206,37 @@ class TestFlowOrchestrator:
                     state.stop_reason = "max iterations reached"
                     break
 
+            graph = _trace_graph(state)
+            state.runtime_graph = graph
+            with trace_span(
+                "orchestrator.graph",
+                input_data={"decision_trace": state.decision_trace},
+                output_data=graph,
+                metadata={
+                    "component": "orchestrator",
+                    "graph_format": "nodes_edges_mermaid",
+                    "node_count": len(graph["nodes"]),
+                    "edge_count": len(graph["edges"]),
+                },
+            ):
+                pass
+
+            trace_output = state.to_summary_dict()
             update_current_trace(
-                output_data=state.to_summary_dict(),
+                output_data=trace_output,
                 metadata={
                     "status": state.status,
                     "stop_reason": state.stop_reason,
                     "iterations": state.iterations,
                     "actions_taken": state.actions_taken,
+                    "graph": {
+                        "node_count": len(graph["nodes"]),
+                        "edge_count": len(graph["edges"]),
+                        "mermaid": graph["mermaid"],
+                    },
                 },
             )
-            update_current_span(output_data=state.to_summary_dict())
+            update_current_span(output_data=trace_output)
 
         return state
 
@@ -448,6 +474,125 @@ def _trace_state(state: TestFlowState) -> dict[str, Any]:
         "import_error": state.import_error,
         "actions_taken": list(state.actions_taken),
     }
+
+
+def _trace_metrics(state: TestFlowState) -> dict[str, Any]:
+    return {
+        "pass_rate": state.pass_rate,
+        "coverage": state.coverage,
+        "coverage_threshold": state.coverage_threshold,
+        "total_tests": state.total_tests,
+        "passed": state.passed,
+        "failed": state.failed,
+        "errors": state.errors,
+        "iterations": state.iterations,
+        "has_tests": state.has_tests,
+        "coverage_measured": state.coverage_measured,
+        "syntax_error": state.syntax_error,
+        "import_error": state.import_error,
+    }
+
+
+def _trace_graph(state: TestFlowState) -> dict[str, Any]:
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    mermaid_lines = ["flowchart TD"]
+
+    for item in state.decision_trace:
+        step = int(item.get("step", len(nodes)))
+        status_before = str(item.get("status_before", "unknown"))
+        status_after = str(item.get("status_after") or _next_status_after(state, step))
+        action = str(item.get("action", "unknown"))
+        reason = str(item.get("reason", ""))
+        before_id = f"S{step}"
+        action_id = f"A{step}"
+        after_id = f"S{step + 1}"
+
+        nodes.append(
+            {
+                "id": before_id,
+                "type": "state",
+                "label": status_before,
+                "step": step,
+                "metrics": item.get("metrics_before", {}),
+            }
+        )
+        nodes.append(
+            {
+                "id": action_id,
+                "type": "action",
+                "label": action,
+                "step": step,
+                "reason": reason,
+            }
+        )
+        nodes.append(
+            {
+                "id": after_id,
+                "type": "state",
+                "label": status_after,
+                "step": step + 1,
+                "metrics": item.get("metrics_after", {}),
+            }
+        )
+
+        edges.append(
+            {
+                "source": before_id,
+                "target": action_id,
+                "label": reason,
+                "type": "planner_decision",
+            }
+        )
+        edges.append(
+            {
+                "source": action_id,
+                "target": after_id,
+                "label": status_after,
+                "type": "state_update",
+            }
+        )
+
+        mermaid_lines.append(f'    {before_id}["state: {_mermaid_label(status_before)}"]')
+        mermaid_lines.append(f'    {action_id}["action: {_mermaid_label(action)}"]')
+        mermaid_lines.append(f'    {after_id}["state: {_mermaid_label(status_after)}"]')
+        mermaid_lines.append(f"    {before_id} -->|{_mermaid_label(reason)}| {action_id}")
+        mermaid_lines.append(f"    {action_id} -->|{_mermaid_label(status_after)}| {after_id}")
+
+    return {
+        "type": "state_action_graph",
+        "nodes": _dedupe_graph_nodes(nodes),
+        "edges": edges,
+        "mermaid": "\n".join(mermaid_lines),
+        "timeline": [
+            {
+                "step": item.get("step"),
+                "from": item.get("status_before"),
+                "action": item.get("action"),
+                "to": item.get("status_after"),
+                "reason": item.get("reason"),
+            }
+            for item in state.decision_trace
+        ],
+    }
+
+
+def _next_status_after(state: TestFlowState, step: int) -> str:
+    next_index = step + 1
+    if next_index < len(state.decision_trace):
+        return str(state.decision_trace[next_index].get("status_before", "unknown"))
+    return state.status
+
+
+def _dedupe_graph_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[str, dict[str, Any]] = {}
+    for node in nodes:
+        deduped[node["id"]] = node
+    return list(deduped.values())
+
+
+def _mermaid_label(value: str) -> str:
+    return value.replace('"', "'").replace("|", "/").replace("\n", " ")[:80]
 
 
 def _display_target(state: TestFlowState) -> str:

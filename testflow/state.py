@@ -70,6 +70,7 @@ class TestFlowState:
     max_iterations: int = 12
     actions_taken: list[str] = field(default_factory=list)
     decision_trace: list[dict[str, Any]] = field(default_factory=list)
+    runtime_graph: dict[str, Any] = field(default_factory=dict)
     status: str = "initialized"
     stop_reason: str = ""
 
@@ -124,6 +125,7 @@ class TestFlowState:
             "test_file": _display_path(self.test_file),
             "actions_taken": list(self.actions_taken),
             "decision_trace": list(self.decision_trace),
+            "graph": dict(self.runtime_graph),
             "pass_rate": self.pass_rate,
             "coverage": self.coverage,
             "total_tests": total_tests,
