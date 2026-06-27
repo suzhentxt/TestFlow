@@ -214,6 +214,8 @@ Run one specific file:
 
 The command generates tests, runs them, prints coverage, writes XML/HTML reports, flushes Langfuse traces, and prints the newest Langfuse trace URL when credentials are configured.
 
+In Langfuse, open the printed trace URL or filter by trace name `testflow-real-flow`. The tree shows the full flow: analyze target, find edge cases, generate tests, run generated tests, measure coverage, and write coverage artifacts. The LLM generation observation is nested under `generate-tests`.
+
 ## Example Output
 
 ```text

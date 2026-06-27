@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, nullcontext
 import os
+import re
 import subprocess
 import sys
+import time
 from pathlib import Path
+from typing import Any, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -80,43 +84,138 @@ def run_target(
     print(f"Generated tests: {test_file}", flush=True)
     print(f"Coverage source: {coverage_source}", flush=True)
 
-    analysis = AnalyzerAgent().run({"target_file": str(target)})
-    edge_cases = EdgeCaseAgent().run({"analysis": analysis})
-    test_code = TestGeneratorAgent().run(
-        {
-            "analysis": analysis,
-            "edge_cases": edge_cases,
-            "target_file": str(target),
-            "source_code": analysis.get("source", ""),
-        }
-    )
-    test_code = make_target_importable(test_code, target)
-    test_file.write_text(test_code, encoding="utf-8")
+    tracer = FlowTracer()
+    with tracer.observation(
+        name="testflow-real-flow",
+        as_type="chain",
+        input={"target": str(target), "coverage_source": str(coverage_source)},
+        metadata={"generated_tests": str(test_file), "report_dir": str(report_dir)},
+    ) as flow:
+        with tracer.observation(name="analyze-target", as_type="agent", input={"target": str(target)}) as span:
+            analysis = AnalyzerAgent().run({"target_file": str(target)})
+            span.update(
+                output={
+                    "functions": [item.get("name") for item in analysis.get("functions", [])],
+                    "classes": [item.get("name") for item in analysis.get("classes", [])],
+                }
+            )
+
+        with tracer.observation(
+            name="find-edge-cases",
+            as_type="agent",
+            input={"function_count": len(analysis.get("functions", []))},
+        ) as span:
+            edge_cases = EdgeCaseAgent().run({"analysis": analysis})
+            span.update(
+                output={
+                    "edge_case_groups": len(edge_cases),
+                    "functions": [item.get("function") for item in edge_cases],
+                }
+            )
+
+        with tracer.observation(
+            name="generate-tests",
+            as_type="agent",
+            input={
+                "target": str(target),
+                "functions": [item.get("name") for item in analysis.get("functions", [])],
+                "edge_case_groups": len(edge_cases),
+            },
+        ) as span:
+            test_code = TestGeneratorAgent().run(
+                {
+                    "analysis": analysis,
+                    "edge_cases": edge_cases,
+                    "target_file": str(target),
+                    "source_code": analysis.get("source", ""),
+                }
+            )
+            test_code = make_target_importable(test_code, target)
+            test_file.write_text(test_code, encoding="utf-8")
+            span.update(output={"test_file": str(test_file), "test_code_chars": len(test_code)})
+
+        flush_traces()
+
+        print(f"Functions discovered: {len(analysis.get('functions', []))}", flush=True)
+        print(f"Edge-case groups: {len(edge_cases)}", flush=True)
+
+        with tracer.observation(name="coverage-erase", as_type="tool"):
+            _run([sys.executable, "-m", "coverage", "erase"])
+
+        with tracer.observation(
+            name="run-generated-tests",
+            as_type="tool",
+            input={"test_file": str(test_file)},
+        ) as span:
+            pytest_result = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "coverage",
+                    "run",
+                    f"--source={coverage_source}",
+                    "-m",
+                    "pytest",
+                    str(test_file),
+                    "-q",
+                ]
+            )
+            span.update(
+                output={
+                    "returncode": pytest_result.returncode,
+                    "stdout": pytest_result.stdout[-2000:],
+                    "stderr": pytest_result.stderr[-2000:],
+                },
+                level="ERROR" if pytest_result.returncode else "DEFAULT",
+            )
+
+        with tracer.observation(
+            name="measure-coverage",
+            as_type="evaluator",
+            input={"target": str(target)},
+        ) as span:
+            report_result = _run([sys.executable, "-m", "coverage", "report", "-m", str(target)])
+            coverage_percent = _coverage_percent(report_result.stdout, target)
+            span.update(
+                output={
+                    "returncode": report_result.returncode,
+                    "coverage_percent": coverage_percent,
+                    "stdout": report_result.stdout,
+                    "stderr": report_result.stderr,
+                },
+                level="ERROR" if report_result.returncode else "DEFAULT",
+            )
+
+        with tracer.observation(name="write-coverage-artifacts", as_type="tool") as span:
+            xml_result = _run([sys.executable, "-m", "coverage", "xml", "-o", str(xml_file)])
+            html_result = None
+            if html:
+                html_result = _run([sys.executable, "-m", "coverage", "html", "-d", str(html_dir)])
+            span.update(
+                output={
+                    "xml_file": str(xml_file),
+                    "html_file": str(html_dir / "index.html") if html else "",
+                    "xml_returncode": xml_result.returncode,
+                    "html_returncode": html_result.returncode if html_result else None,
+                },
+                level="ERROR" if xml_result.returncode or (html_result and html_result.returncode) else "DEFAULT",
+            )
+
+        flow.update(
+            output={
+                "target": str(target),
+                "test_file": str(test_file),
+                "pytest_returncode": pytest_result.returncode,
+                "coverage_percent": coverage_percent,
+                "coverage_xml": str(xml_file),
+                "coverage_html": str(html_dir / "index.html") if html else "",
+            },
+            level="ERROR" if pytest_result.returncode or report_result.returncode else "DEFAULT",
+        )
+
+    tracer.flush()
     flush_traces()
-
-    print(f"Functions discovered: {len(analysis.get('functions', []))}", flush=True)
-    print(f"Edge-case groups: {len(edge_cases)}", flush=True)
-
-    _run([sys.executable, "-m", "coverage", "erase"])
-    pytest_result = _run(
-        [
-            sys.executable,
-            "-m",
-            "coverage",
-            "run",
-            f"--source={coverage_source}",
-            "-m",
-            "pytest",
-            str(test_file),
-            "-q",
-        ]
-    )
-    report_result = _run([sys.executable, "-m", "coverage", "report", "-m", str(target)])
-    _run([sys.executable, "-m", "coverage", "xml", "-o", str(xml_file)])
-    if html:
-        _run([sys.executable, "-m", "coverage", "html", "-d", str(html_dir)])
-
-    trace_url = latest_langfuse_trace_url()
+    trace_url = tracer.trace_url() or latest_langfuse_trace_url("testflow-real-flow")
     print("============== Flow Artifacts ===============", flush=True)
     print(f"Generated tests: {test_file}", flush=True)
     print(f"Coverage XML: {xml_file}", flush=True)
@@ -150,7 +249,90 @@ def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     return result
 
 
-def latest_langfuse_trace_url() -> str:
+def _coverage_percent(stdout: str, target: Path) -> float:
+    target_name = str(target).replace("/", "\\")
+    for line in stdout.splitlines():
+        if str(target) in line or target_name in line or target.name in line:
+            match = re.search(r"(\d+(?:\.\d+)?)%", line)
+            if match:
+                return float(match.group(1))
+    match = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+(?:\.\d+)?)%", stdout)
+    if match:
+        return float(match.group(1))
+    return 0.0
+
+
+class FlowTracer:
+    def __init__(self) -> None:
+        self.client: Any | None = None
+        self.last_trace_id = ""
+        if not _truthy(os.getenv("LANGFUSE_ENABLED", "true")):
+            return
+        public_key = _env_secret("LANGFUSE_PUBLIC_KEY")
+        secret_key = _env_secret("LANGFUSE_SECRET_KEY")
+        if not public_key or not secret_key:
+            return
+        try:
+            from langfuse import Langfuse
+        except Exception:
+            return
+        try:
+            self.client = Langfuse(public_key=public_key, secret_key=secret_key, host=_langfuse_host())
+        except Exception:
+            self.client = None
+
+    @contextmanager
+    def observation(
+        self,
+        *,
+        name: str,
+        as_type: str,
+        input: Any | None = None,
+        output: Any | None = None,
+        metadata: Any | None = None,
+    ) -> Iterator[Any]:
+        if self.client is None:
+            with nullcontext(NoopObservation()) as observation:
+                yield observation
+            return
+
+        with self.client.start_as_current_observation(
+            name=name,
+            as_type=as_type,
+            input=input,
+            output=output,
+            metadata=metadata,
+        ) as observation:
+            if not self.last_trace_id:
+                try:
+                    self.last_trace_id = self.client.get_current_trace_id() or ""
+                except Exception:
+                    self.last_trace_id = ""
+            yield observation
+
+    def trace_url(self) -> str:
+        if self.client is None or not self.last_trace_id:
+            return ""
+        try:
+            return self.client.get_trace_url(trace_id=self.last_trace_id) or ""
+        except Exception:
+            return ""
+
+    def flush(self) -> None:
+        if self.client is None:
+            return
+        try:
+            self.client.flush()
+        except Exception:
+            return
+
+
+class NoopObservation:
+    def update(self, **_: Any) -> "NoopObservation":
+        return self
+
+
+def latest_langfuse_trace_url(name: str = "testflow-real-flow", attempts: int = 5, delay: float = 0.8) -> str:
     try:
         from langfuse import Langfuse
     except Exception:
@@ -162,15 +344,13 @@ def latest_langfuse_trace_url() -> str:
         return ""
 
     try:
-        client = Langfuse(
-            public_key=public_key,
-            secret_key=secret_key,
-            host=_langfuse_host(),
-        )
-        traces = client.api.trace.list(limit=1, name="llm-client-generate")
-        if not traces.data:
-            return ""
-        return client.get_trace_url(trace_id=traces.data[0].id) or ""
+        client = Langfuse(public_key=public_key, secret_key=secret_key, host=_langfuse_host())
+        for _ in range(attempts):
+            traces = client.api.trace.list(limit=1, name=name)
+            if traces.data:
+                return client.get_trace_url(trace_id=traces.data[0].id) or ""
+            time.sleep(delay)
+        return ""
     except Exception:
         return ""
 
@@ -187,6 +367,10 @@ def _env_secret(name: str) -> str:
     if not value or value.startswith("replace-with-") or "your-" in value:
         return ""
     return value
+
+
+def _truthy(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 if __name__ == "__main__":

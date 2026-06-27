@@ -127,6 +127,28 @@
   - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_real_flow.py --target examples\string_utils.py` -> exit 0, generated `generated_tests\test_string_utils_real.py`, ran 12 generated tests, reported 100% coverage for `examples\string_utils.py`, wrote `.testflow\string_utils_coverage.xml`, wrote `.testflow\htmlcov\string_utils\index.html`, and printed a Langfuse trace URL.
   - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
 
+## Session 008 - 2026-06-27
+
+- Goal: show the real-agent flow as a multi-step Langfuse trace instead of a single generation trace.
+- Completed:
+  - Updated `scripts/run_real_flow.py` to create a root Langfuse trace named `testflow-real-flow`.
+  - Added nested observations for:
+    - `analyze-target`
+    - `find-edge-cases`
+    - `generate-tests`
+    - `coverage-erase`
+    - `run-generated-tests`
+    - `measure-coverage`
+    - `write-coverage-artifacts`
+  - Kept the LLM generation observation nested under `generate-tests`.
+  - Updated README to explain filtering by `testflow-real-flow`.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 8 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m py_compile scripts\run_real_flow.py` -> pass.
+  - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_real_flow.py --target examples\string_utils.py` -> exit 0, 12 generated tests passed, coverage 100%, and printed current trace URL `https://cloud.langfuse.com/project/cmqw0y8yq0362ad0dxk71tbeo/traces/037b6b3c7eb766624afdb1c40fd83e17`.
+  - Langfuse API check for trace `037b6b3c7eb766624afdb1c40fd83e17` -> trace name `testflow-real-flow`, 9 observations, including `CHAIN`, `AGENT`, `GENERATION`, `TOOL`, and `EVALUATOR`; generation is parented under the generate-tests agent observation.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+
 ## Next Best Step
 
 Finish `tf-001`: add `pyproject.toml` and an installable console entry point so `.venv` can run `testflow --help` and eventually `testflow run ...`.
