@@ -6,19 +6,39 @@ One-shot LLM unit test generation is unreliable because generated tests can have
 
 This demo proves the full loop: generation -> execution -> repair -> coverage expansion.
 
-## 2. Setup
+## 2. Streamlit App Judging Flow
+
+Use this 5-minute flow when judges ask for a public App URL:
+
+1. Open the Streamlit App URL.
+2. Select `Demo Mode` in the sidebar.
+3. Click `Run TestFlow`.
+4. Show the metrics: pass rate, coverage, iterations, and repairs triggered.
+5. Walk through the execution timeline: analyze, generate, run, observe, repair, measure coverage, generate missing tests, final report.
+6. Open the `Generated Tests` tab and point out pytest cases for normal behavior, exceptions, and boundary inputs.
+7. Open the `Final Summary JSON` tab to show the state-based execution result.
+8. If judges ask about implementation depth, open the GitHub code for `testflow/orchestrator.py`, `testflow/runner.py`, and `README.md`.
+9. If the app fails, fall back to the CLI command below.
+
+## 3. Setup
 
 ```bash
 powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1
 ```
 
-## 3. Main Demo Command
+Run the Streamlit UI locally:
+
+```bash
+streamlit run ui/app.py
+```
+
+## 4. Main Demo Command
 
 ```bash
 python main.py --target examples/calculator.py
 ```
 
-## 4. Expected Output Shape
+## 5. Expected Output Shape
 
 ```text
 ========== TestFlow Report ==========
@@ -36,7 +56,7 @@ Status: completed
 ====================================
 ```
 
-## 5. What To Say During The Demo
+## 6. What To Say During The Demo
 
 "Most tools stop after generating tests. That is the fragile part: generated tests might not import correctly, might fail for the wrong reason, or might miss important branches."
 
@@ -50,7 +70,7 @@ Status: completed
 
 "The orchestrator stops only when execution metrics are good enough, then it prints a final report and writes the generated test file."
 
-## 6. Files To Open During Judging
+## 7. Files To Open During Judging
 
 - `examples/calculator.py`
 - `generated_tests/test_calculator.py`
@@ -58,13 +78,19 @@ Status: completed
 - `testflow/runner.py`
 - `coverage.xml` or `.testflow/final_summary.json` if available
 
-## 7. Backup Plan
+## 8. Backup Plan
 
 If the OpenAI API key is unavailable, the API quota is exhausted, or LLM generation fails, use deterministic fallback generation. The fallback should still produce pytest tests for the demo target so the runtime loop can be shown.
 
 Explain this clearly: the engineering contribution is execution-guided orchestration, not only the model call. Even with fallback generation, TestFlow still demonstrates the core loop: analyze source code, generate tests, run pytest, observe failures, repair, measure coverage, and generate more tests when coverage is low.
 
-## 8. 30-Second Emergency Demo
+If the Streamlit app fails during judging, use the CLI fallback:
+
+```bash
+python main.py --target examples/calculator.py
+```
+
+## 9. 30-Second Emergency Demo
 
 "TestFlow is an execution-guided unit test orchestrator for Python. Instead of doing one-shot `Code -> LLM -> Tests`, it generates pytest tests, runs them, reads failures, repairs using traceback, measures coverage, and adds tests for uncovered behavior."
 
