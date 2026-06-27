@@ -149,7 +149,7 @@ class _LangfuseTracer:
             self.client = Langfuse(
                 public_key=public_key,
                 secret_key=secret_key,
-                host=os.getenv("LANGFUSE_HOST") or "https://cloud.langfuse.com",
+                host=_env_host("LANGFUSE_HOST", "https://cloud.langfuse.com"),
             )
         except Exception:
             self.client = None
@@ -248,6 +248,13 @@ def _truthy(value: str | None) -> bool:
 
 def _env_secret(name: str) -> str | None:
     value = (os.getenv(name) or "").strip()
-    if not value or value.startswith("replace-with-"):
+    if not value or value.startswith("replace-with-") or "your-" in value:
         return None
+    return value
+
+
+def _env_host(name: str, default: str) -> str:
+    value = (os.getenv(name) or "").strip()
+    if not value or value.startswith("replace-with-") or "your-" in value:
+        return default
     return value

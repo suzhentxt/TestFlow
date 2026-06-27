@@ -110,6 +110,23 @@
   - `bash ./init.sh` is still blocked on this Windows machine because WSL has no installed distro.
   - The direct agent smoke flow uses the real API when `.env` contains a valid `OPENAI_API_KEY`; otherwise it uses the deterministic fallback.
 
+## Session 007 - 2026-06-27
+
+- Goal: make the real agent flow easier to run for local target files.
+- Completed:
+  - Added `scripts/run_real_flow.py` as a one-command flow for real agent generation, pytest execution, coverage XML/HTML output, Langfuse flush, and latest trace URL printing.
+  - Added `test_data/README.md` to define `test_data/` as the default folder for local Python target files.
+  - Documented the folder convention in `README.md`:
+    - `test_data/` for target Python files.
+    - `generated_tests/` for generated pytest files.
+    - `.testflow/` for coverage XML/HTML reports and run artifacts.
+  - Fixed `llm_client.py` so placeholder `LANGFUSE_HOST` values fall back to `https://cloud.langfuse.com`.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 8 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m py_compile scripts\run_real_flow.py` -> pass.
+  - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_real_flow.py --target examples\string_utils.py` -> exit 0, generated `generated_tests\test_string_utils_real.py`, ran 12 generated tests, reported 100% coverage for `examples\string_utils.py`, wrote `.testflow\string_utils_coverage.xml`, wrote `.testflow\htmlcov\string_utils\index.html`, and printed a Langfuse trace URL.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+
 ## Next Best Step
 
 Finish `tf-001`: add `pyproject.toml` and an installable console entry point so `.venv` can run `testflow --help` and eventually `testflow run ...`.

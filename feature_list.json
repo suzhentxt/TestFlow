@@ -126,9 +126,10 @@
       ],
       "evidence": [
         "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe scripts\\run_agent_smoke.py --target examples\\calculator.py` exited 0, discovered 5 functions, and wrote `generated_tests\\test_agent_smoke.py`.",
-        "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe -m pytest generated_tests\\test_agent_smoke.py -q` reported 5 passed."
+        "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe -m pytest generated_tests\\test_agent_smoke.py -q` reported 5 passed.",
+        "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe scripts\\run_real_flow.py --target examples\\string_utils.py` exited 0, generated `generated_tests\\test_string_utils_real.py`, ran 12 generated tests, reported 100% coverage, wrote coverage XML/HTML artifacts under `.testflow`, and printed a Langfuse trace URL."
       ],
-      "notes": "A root-level generator/repair/coverage/verifier agent layer was merged and import-smoked. `scripts/run_agent_smoke.py` can exercise Analyzer, EdgeCase, and TestGenerator directly; with OPENAI_API_KEY in .env it calls the real model and traces via Langfuse if LANGFUSE keys are configured. The smoke script now prepends the target file directory to generated tests so LLM output like `from calculator import ...` is runnable for `examples/calculator.py`. Runtime still uses deterministic orchestrator fallbacks for the main demo path until agent integration is explicitly completed."
+      "notes": "A root-level generator/repair/coverage/verifier agent layer was merged and import-smoked. `scripts/run_agent_smoke.py` can exercise Analyzer, EdgeCase, and TestGenerator directly; with OPENAI_API_KEY in .env it calls the real model and traces via Langfuse if LANGFUSE keys are configured. `scripts/run_real_flow.py` is the easier real-agent command: it reads targets from `test_data/` by default, writes generated pytest files to `generated_tests/`, writes coverage XML/HTML reports under `.testflow/`, and prints the newest Langfuse trace URL. Runtime still uses deterministic orchestrator fallbacks for the main demo path until agent integration is explicitly completed."
     },
     {
       "id": "tf-006",
