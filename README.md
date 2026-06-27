@@ -167,6 +167,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1
 python main.py --target examples/calculator.py
 ```
 
+## Real Agent and Langfuse Setup
+
+Create local secrets in `.env`:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_HOST=https://cloud.langfuse.com
+LANGFUSE_CAPTURE_IO=false
+```
+
+`.env` is ignored by git. Keep `LANGFUSE_CAPTURE_IO=false` unless you are comfortable sending source prompts and generated tests to Langfuse.
+
+Run the merged agent layer directly:
+
+```bash
+.\.venv\Scripts\python.exe scripts\run_agent_smoke.py --target examples\calculator.py
+```
+
+With real OpenAI and Langfuse keys, `TestGeneratorAgent` calls the model and the LLM call is traced in Langfuse. Without keys, the same command uses deterministic fallback behavior.
+
 ## Example Output
 
 ```text

@@ -60,3 +60,17 @@ def test_main_cli_runs_without_crashing_for_tmp_project(tmp_path):
     assert "TestFlow Runtime Summary" in result.stdout
     assert "Traceback" not in result.stderr
     assert (tmp_path / ".testflow" / "final_summary.json").is_file()
+
+
+def test_merged_agent_layer_imports():
+    from agents.analyzer import AnalyzerAgent
+    from agents.coverage_agent import CoverageAgent
+    from agents.generator import TestGeneratorAgent
+    from agents.repair import RepairAgent
+    from agents.verifier import VerifierAgent
+
+    assert AnalyzerAgent
+    assert TestGeneratorAgent
+    assert RepairAgent
+    assert CoverageAgent
+    assert VerifierAgent

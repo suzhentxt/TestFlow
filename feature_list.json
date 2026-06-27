@@ -24,7 +24,7 @@
     "windows_command": "powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1",
     "bash_command": "./init.sh",
     "scope": "Repository-process validation plus .venv dependency and test execution whenever Python is available.",
-    "last_result": "2026-06-27: init.ps1 passed outside the sandbox using D:\\TestFlow\\.venv; dependencies were installed in .venv and the full runtime test suite passed with 7 tests. Demo command `python main.py --target examples/calculator.py` exited 0, wrote generated_tests/test_calculator.py, and reported 100% pass rate / 100% target-file coverage. Inside the default sandbox, .venv Python cannot access its base interpreter under C:\\Users. Bash remains blocked because WSL has no installed distro."
+    "last_result": "2026-06-27: after merging the root agent layer, init.ps1 passed outside the sandbox using D:\\TestFlow\\.venv and the full test suite passed with 8 tests. Demo command `python main.py --target examples/calculator.py` exited 0, wrote generated_tests/test_calculator.py, and reported 100% pass rate / 100% target-file coverage. A package shim `testflow/llm_client.py` was added so merged agents can import `testflow.llm_client`. `.env` placeholders, lightweight env loading, optional Langfuse tracing, and `scripts/run_agent_smoke.py` were added for direct agent testing. Inside the default sandbox, .venv Python cannot access its base interpreter under C:\\Users. Bash remains blocked because WSL has no installed distro."
   },
   "features": [
     {
@@ -78,7 +78,7 @@
         "Run unit tests for the analyzer."
       ],
       "evidence": [],
-      "notes": ""
+      "notes": "A root-level AnalyzerAgent was merged and now imports successfully in tests, but this feature is not passing until it is wired into an installable CLI/analyze command and verified end to end."
     },
     {
       "id": "tf-003",
@@ -124,8 +124,11 @@
         "Verify production source files are unchanged.",
         "Run generated tests and record result."
       ],
-      "evidence": [],
-      "notes": "LLM-backed generation can start behind an interface with deterministic test fixtures."
+      "evidence": [
+        "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe scripts\\run_agent_smoke.py --target examples\\calculator.py` exited 0, discovered 5 functions, and wrote `generated_tests\\test_agent_smoke.py`.",
+        "2026-06-27: `D:\\TestFlow\\.venv\\Scripts\\python.exe -m pytest generated_tests\\test_agent_smoke.py -q` reported 5 passed."
+      ],
+      "notes": "A root-level generator/repair/coverage/verifier agent layer was merged and import-smoked. `scripts/run_agent_smoke.py` can exercise Analyzer, EdgeCase, and TestGenerator directly; with OPENAI_API_KEY in .env it calls the real model and traces via Langfuse if LANGFUSE keys are configured. The smoke script now prepends the target file directory to generated tests so LLM output like `from calculator import ...` is runnable for `examples/calculator.py`. Runtime still uses deterministic orchestrator fallbacks for the main demo path until agent integration is explicitly completed."
     },
     {
       "id": "tf-006",

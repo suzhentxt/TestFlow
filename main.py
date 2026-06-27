@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from testflow.llm_client import flush_traces
 from testflow.orchestrator import run_testflow
 from testflow.state import TestFlowState
 
@@ -41,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     summary_data["summary_text"] = summary
     summary_data["raw_state"] = final_state.to_dict()
     summary_path.write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
+    flush_traces()
 
     return 0 if final_state.pass_rate == 1.0 else 1
 

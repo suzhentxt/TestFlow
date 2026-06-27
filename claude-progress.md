@@ -1,83 +1,115 @@
-# Nhật ký Tiến độ
+# TestFlow Progress Log
 
-## Trạng thái Đã xác minh Hiện tại
+## Current Verified State
 
-- Thư mục gốc kho lưu trữ: `D:\TestFlow`
-- Product spec hiện tại: `README.md`
-- Đường dẫn khởi động/xác minh chuẩn trên Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1`
-- Đường dẫn khởi động/xác minh chuẩn trên Bash: `./init.sh`
-- Phạm vi baseline hiện tại: process validation + `.venv` bootstrap + dependency install + pytest khi Python có sẵn. Repo đã có `testflow/state.py` và `tests/test_state.py`, nhưng chưa có `pyproject.toml` hoặc CLI.
-- Tính năng chưa hoàn thành có mức ưu tiên cao nhất sau tác vụ tài liệu: `tf-001` - Create installable Python CLI skeleton.
-- Sự cố chặn hiện tại: `.venv` chạy được trong môi trường Windows thật và baseline PowerShell pass khi chạy ngoài sandbox. Trong sandbox mặc định của Codex, `.venv` Python không truy cập được base interpreter dưới `C:\Users`. Bash không chạy trong sandbox Windows vì WSL chưa có distro.
+- Repo root: `D:\TestFlow`.
+- Product spec: `README.md`.
+- Windows baseline: `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1`.
+- Bash baseline: `./init.sh`.
+- Current runnable demo: `python main.py --target examples/calculator.py`.
+- Runtime engine exists in:
+  - `main.py`
+  - `testflow/state.py`
+  - `testflow/runner.py`
+  - `testflow/coverage_utils.py`
+  - `testflow/orchestrator.py`
+  - `testflow/llm_client.py`
+- Merged agent layer currently lives in root `agents/` plus root `llm_client.py`.
+- There is still no `pyproject.toml` and no installable `testflow` console script.
+- Bash remains blocked on this Windows machine because WSL has no installed distro.
+- In Codex sandbox, `.venv` Python needs escalation because the base interpreter is under `C:\Users`.
 
-## Nhật ký Phiên
+## Session 001 - 2026-06-27
 
-### Phiên 001 - 2026-06-27
+- Goal: adapt long-running process docs from template state to TestFlow.
+- Completed:
+  - Created canonical process artifacts without imported ` (1)` suffix.
+  - Replaced template feature list with TestFlow MVP roadmap.
+  - Added/updated `AGENTS.md`, `CLAUDE.md`, `feature_list.json`, `claude-progress.md`, `init.sh`, `init.ps1`, `clean-state-checklist.md`, `evaluator-rubric.md`, `quality-document.md`, `session-handoff.md`, and `index.md`.
+- Verification:
+  - `pwd` -> `D:\TestFlow`.
+  - `git -c safe.directory=D:/TestFlow log --oneline -5` succeeded.
+  - PowerShell baseline passed at the docs-only stage.
+  - Bash baseline failed because WSL had no installed distro.
 
-- Mục tiêu: Chuyển bộ tài liệu quy trình từ template chung sang trạng thái phù hợp với project TestFlow hiện tại.
-- Đã hoàn thành:
-  - Đọc `README.md` và xác nhận TestFlow là execution-guided unit test orchestrator cho Python/pytest.
-  - Phát hiện các artifact chuẩn ban đầu bị thiếu vì file import có hậu tố ` (1)`.
-  - Tạo/cập nhật artifact chuẩn không hậu tố: `feature_list.json`, `claude-progress.md`, `init.sh`, `init.ps1`, `CLAUDE.md`, `session-handoff.md`, `clean-state-checklist.md`, `quality-document.md`, `evaluator-rubric.md`.
-  - Xoá các file trùng có hậu tố ` (1)` sau khi tạo bản canonical không hậu tố.
-  - Thay feature list mẫu app chat bằng roadmap TestFlow MVP.
-- Xác minh đã chạy:
-  - `pwd` -> `D:\TestFlow`
-  - `git -c safe.directory=D:/TestFlow log --oneline -5` -> `9df7224 Update README.md`, `bddd6f7 Initial commit`
-  - Bash baseline -> thất bại do WSL chưa có distro; đây là blocker môi trường cho Bash.
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` -> exit 0; docs-only baseline passed; implementation scaffold not present yet.
-- Bằng chứng đã ghi lại:
-  - `feature_list.json` có `ops-001` cho tác vụ tài liệu và các feature `tf-001` đến `tf-008` cho MVP TestFlow.
-  - `quality-document.md` ghi rõ repo hiện là docs/product-spec baseline, chưa có implementation scaffold.
-- Commit: chưa tạo được. `git add` trong sandbox thất bại vì không tạo được `.git/index.lock`; yêu cầu chạy ngoài sandbox bị từ chối.
-- Tệp hoặc artifact đã cập nhật:
-  - `AGENTS.md`
-  - `CLAUDE.md`
-  - `feature_list.json`
-  - `claude-progress.md`
-  - `init.sh`
-  - `init.ps1`
-  - `clean-state-checklist.md`
-  - `evaluator-rubric.md`
-  - `quality-document.md`
-  - `session-handoff.md`
-  - `index.md`
-- Rủi ro đã biết hoặc vấn đề chưa được giải quyết:
-  - Chưa có package Python, CLI, agents, examples, hoặc tests.
-  - Bash path chưa xác minh được trong sandbox hiện tại vì WSL chưa được cài distro.
-  - Git trong sandbox cần `-c safe.directory=D:/TestFlow` hoặc cấu hình safe.directory ngoài repo.
-  - Thay đổi tài liệu chưa được commit vì quyền ghi `.git` bị chặn.
-- Bước tốt nhất tiếp theo: tiếp tục `tf-001` bằng cách thêm `pyproject.toml`, CLI entry point, và smoke tests; khi Codex cần chạy Python trong `.venv`, dùng approval ngoài sandbox vì base interpreter nằm dưới `C:\Users`.
+## Session 002 - 2026-06-27
 
-### Phiên 002 - 2026-06-27
+- Goal: standardize repo Python commands through `.venv`.
+- Completed:
+  - Updated `init.ps1` to create/use `.venv`, install `requirements.txt`, install editable package when `pyproject.toml` exists, and run pytest through `.venv`.
+  - Updated `init.sh` similarly for Bash-compatible environments.
+  - Updated process docs to avoid global Python/pip/pytest outside bootstrap.
+- Verification:
+  - `.venv\Scripts\python.exe` resolved to `D:\TestFlow\.venv`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` passed outside sandbox.
+  - `bash ./init.sh` remained blocked by missing WSL distro.
 
-- Mục tiêu: Chuẩn hóa toàn bộ lệnh Python của repo để chạy qua `.venv`.
-- Đã hoàn thành:
-  - Cập nhật `init.ps1` để tạo `.venv` nếu thiếu, cài `requirements.txt`, cài package editable nếu có `pyproject.toml`, và chạy pytest bằng `.\.venv\Scripts\python.exe`.
-  - Cập nhật `init.sh` tương tự cho `.venv/bin/python` hoặc `.venv/Scripts/python.exe`.
-  - Cập nhật README development commands, AGENTS/CLAUDE rules, checklist, handoff, và feature baseline để không dùng Python/pip/pytest global ngoài bước bootstrap.
-- Xác minh đã chạy:
-  - `.\.venv\Scripts\python.exe -c "import sys; print(sys.executable); print(sys.prefix); print(sys.base_prefix)"` chạy ngoài sandbox -> xác nhận `.venv` dùng `D:\TestFlow\.venv` và base `C:\Users\hautt\AppData\Local\Programs\Python\Python310`.
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` chạy ngoài sandbox -> exit 0; cài dependencies trong `.venv`; `tests/test_state.py` pass.
-  - `bash ./init.sh` -> thất bại do WSL chưa có distro.
-- Blocker:
-  - Python trong `.venv` cần chạy ngoài sandbox nếu command cần truy cập base interpreter dưới `C:\Users`.
-  - Bash path vẫn cần WSL distro thật để xác minh.
-### Phien 003 - 2026-06-27
+## Session 003 - 2026-06-27
 
-- Muc tieu: Doc lai repo sau merge `be46f33 Merge branch 'ttrinh' into hautt` va dong bo runtime/demo voi code moi.
-- Da hoan thanh:
-  - Xac nhan baseline Windows trong `.venv` van pass 7 tests.
-  - Dong bo runtime de ghi generated tests vao root `generated_tests/test_<module>.py`, khop README/demo docs va `generated_tests/.gitkeep`.
-  - Mo rong fallback coverage generation bang cac case so hoc an toan cho target demo moi `examples/calculator.py`.
-  - Sua `coverage_utils.run_coverage` de uu tien line coverage cua dung target file thay vi root coverage cua ca thu muc `examples`.
-  - Don artifact generated bi track sai: `.testflow/final_summary.json` va `examples/generated_tests/test_calculator.py`; cap nhat `.gitignore` cho `.testflow/` va nested generated tests.
-  - Cap nhat README, docs demo, feature baseline, va handoff theo command hien tai.
-- Xac minh da chay:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass; 7 tests.
+- Goal: sync runtime and demo after merge `be46f33 Merge branch 'ttrinh' into hautt`.
+- Completed:
+  - Runtime writes generated tests to root `generated_tests/test_<module>.py`.
+  - Coverage parsing now reports target-file line coverage, not whole-directory coverage.
+  - Demo docs were aligned to `python main.py --target examples/calculator.py`.
+  - Generated runtime artifacts were ignored and tracked generated artifacts were removed.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 7 tests.
   - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 7 passed.
-  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0; pass rate 100%; target-file coverage 100%; generated file `generated_tests/test_calculator.py`.
-  - `bash ./init.sh` -> van fail vi WSL chua co installed distro.
-- Trang thai hien tai:
-  - Demo command dung hien tai: `python main.py --target examples/calculator.py`.
-  - Chua co installable CLI/console script `testflow run`; `tf-001` van chua passing cho den khi co `pyproject.toml`.
+  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0, pass rate 100%, target-file coverage 100%.
+
+## Session 004 - 2026-06-27
+
+- Goal: update repo after merging the root-level agent layer.
+- Completed:
+  - Added `testflow/llm_client.py` as a compatibility shim so merged agents can import `testflow.llm_client`.
+  - Added an integration smoke test that imports merged agents:
+    - `agents.analyzer.AnalyzerAgent`
+    - `agents.generator.TestGeneratorAgent`
+    - `agents.repair.RepairAgent`
+    - `agents.coverage_agent.CoverageAgent`
+    - `agents.verifier.VerifierAgent`
+  - Updated `feature_list.json` and `session-handoff.md` to reflect the merged agent layer.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 8 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0, pass rate 100%, target-file coverage 100%.
+  - `bash ./init.sh` -> still fails because WSL has no installed distro.
+
+## Session 005 - 2026-06-27
+
+- Goal: make the merged agent layer runnable with real API keys and optional Langfuse tracing.
+- Completed:
+  - Added local `.env` placeholder file. It is ignored by git.
+  - Added lightweight `.env` loading in `llm_client.py`.
+  - Added `langfuse>=3.0.0` to `requirements.txt`; `.venv` installed Langfuse SDK 4.12.0.
+  - Added optional Langfuse generation tracing around `LLMClient.generate()`.
+  - Added `flush_traces()` and call it from `main.py` for short-lived CLI runs.
+  - Added `scripts/run_agent_smoke.py` to run Analyzer, EdgeCase, and TestGenerator directly.
+  - Updated README, feature list, and handoff with real-agent/Langfuse setup.
+- Verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\init.ps1` -> pass, 8 tests.
+  - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_agent_smoke.py --target examples\calculator.py` -> exit 0 with placeholder keys/fallback mode.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0.
+- Usage note:
+  - Replace placeholders in `.env` with real `OPENAI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and correct `LANGFUSE_HOST`.
+  - Keep `LANGFUSE_CAPTURE_IO=false` unless source prompts/generated tests may be sent to Langfuse.
+
+## Session 006 - 2026-06-27
+
+- Goal: smoke-test one real agent generation flow.
+- Completed:
+  - Ran the direct agent smoke flow against `examples/calculator.py`.
+  - Fixed `scripts/run_agent_smoke.py` so generated tests can import a target module located outside the repo root by prepending the target directory to `sys.path`.
+- Verification:
+  - `D:\TestFlow\.venv\Scripts\python.exe scripts\run_agent_smoke.py --target examples\calculator.py` -> exit 0, discovered 5 functions, generated `generated_tests\test_agent_smoke.py`.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest generated_tests\test_agent_smoke.py -q` -> 5 passed.
+  - `D:\TestFlow\.venv\Scripts\python.exe main.py --target examples\calculator.py` -> exit 0, pass rate 100%, target-file coverage 100%.
+  - `D:\TestFlow\.venv\Scripts\python.exe -m pytest tests` -> 8 passed.
+- Notes:
+  - `bash ./init.sh` is still blocked on this Windows machine because WSL has no installed distro.
+  - The direct agent smoke flow uses the real API when `.env` contains a valid `OPENAI_API_KEY`; otherwise it uses the deterministic fallback.
+
+## Next Best Step
+
+Finish `tf-001`: add `pyproject.toml` and an installable console entry point so `.venv` can run `testflow --help` and eventually `testflow run ...`.
