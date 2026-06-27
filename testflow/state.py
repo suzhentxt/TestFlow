@@ -55,7 +55,7 @@ class TestFlowState:
     # Coverage
     coverage: float = 0.0
     coverage_threshold: float | None = None
-    coverage_target: float = 0.8
+    coverage_target: float = 0.95
 
     # Runtime flags
     has_tests: bool = False
@@ -67,7 +67,7 @@ class TestFlowState:
 
     # Control
     iterations: int = 0
-    max_iterations: int = 8
+    max_iterations: int = 12
     actions_taken: list[str] = field(default_factory=list)
     decision_trace: list[dict[str, Any]] = field(default_factory=list)
     status: str = "initialized"

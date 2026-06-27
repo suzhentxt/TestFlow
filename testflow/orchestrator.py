@@ -16,7 +16,7 @@ from testflow.state import Action, TestFlowState
 class HeuristicPlanner:
     """Choose the next TestFlow action from the current runtime state."""
 
-    def __init__(self, coverage_threshold: float = 0.8) -> None:
+    def __init__(self, coverage_threshold: float = 0.95) -> None:
         self.coverage_threshold = coverage_threshold
 
     def choose_next_action(self, state: TestFlowState) -> tuple[Action, str]:
@@ -99,7 +99,7 @@ class HeuristicPlanner:
 class TestFlowOrchestrator:
     """Run TestFlow as State -> Planner -> Action -> Agent -> State."""
 
-    def __init__(self, coverage_threshold: float = 0.8, max_iterations: int = 8) -> None:
+    def __init__(self, coverage_threshold: float = 0.95, max_iterations: int = 12) -> None:
         self.planner = HeuristicPlanner(coverage_threshold)
         self.coverage_threshold = coverage_threshold
         self.max_iterations = max_iterations
@@ -387,7 +387,7 @@ class VerifierAgent:
         return state
 
 
-def run_testflow(state_or_target: TestFlowState | str, coverage_threshold: float = 0.8, max_iterations: int = 8) -> Any:
+def run_testflow(state_or_target: TestFlowState | str, coverage_threshold: float = 0.95, max_iterations: int = 12) -> Any:
     """Run TestFlow.
 
     Passing a TestFlowState returns the final state for backwards compatibility.

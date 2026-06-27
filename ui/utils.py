@@ -38,9 +38,18 @@ def parse_percent(stdout, label):
     return float(match.group(1)) / 100
 
 
-def run_testflow_cli(target_file, timeout_seconds=90):
+def run_testflow_cli(target_file, coverage_target=0.95, max_iterations=12, timeout_seconds=90):
     """Run the TestFlow CLI and return a safe result dictionary."""
-    command = ["python", "main.py", "--target", target_file]
+    command = [
+        "python",
+        "main.py",
+        "--target",
+        target_file,
+        "--coverage-threshold",
+        str(coverage_target),
+        "--max-iterations",
+        str(max_iterations),
+    ]
     try:
         completed = subprocess.run(
             command,

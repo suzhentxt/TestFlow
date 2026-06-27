@@ -10,7 +10,7 @@ This demo proves the full loop: generation -> execution -> repair -> coverage ex
 
 Use this 5-minute flow when judges ask for a public App URL:
 
-1. Open the Streamlit App URL.
+1. Open the Streamlit App URL: https://testflow-uet.streamlit.app/
 2. Select `Demo Mode` in the sidebar.
 3. Click `Run TestFlow`.
 4. Show the metrics: pass rate, coverage, iterations, and repairs triggered.
@@ -35,24 +35,35 @@ streamlit run ui/app.py
 ## 4. Main Demo Command
 
 ```bash
-python main.py --target examples/calculator.py
+python main.py --target examples/calculator.py --coverage-threshold 0.95 --max-iterations 12
 ```
 
 ## 5. Expected Output Shape
 
 ```text
 ========== TestFlow Report ==========
+TestFlow Runtime Summary
 Target: examples/calculator.py
 Generated test file: generated_tests/test_calculator.py
-Actions:
-- analyze
-- generate_tests
-- run_tests
-- measure_coverage
-- generate_missing_tests
-Final pass rate: 100%
-Final coverage: 100%
-Status: completed
+
+Decision trace:
+[0] initialized -> analyze
+    reason: source code not loaded
+[1] analyzed -> find_edge_cases
+    reason: edge cases not discovered
+[2] edge_cases_found -> generate_tests
+    reason: no tests generated
+[3] tests_generated -> run_tests
+    reason: tests need execution
+[4] tests_passed -> measure_coverage
+    reason: tests pass but coverage not measured
+[5] coverage_measured -> generate_missing_tests
+    reason: coverage below threshold
+
+Final metrics:
+Pass rate: 100%
+Coverage: 100%
+Status: success
 ====================================
 ```
 
@@ -87,7 +98,7 @@ Explain this clearly: the engineering contribution is execution-guided orchestra
 If the Streamlit app fails during judging, use the CLI fallback:
 
 ```bash
-python main.py --target examples/calculator.py
+python main.py --target examples/calculator.py --coverage-threshold 0.95 --max-iterations 12
 ```
 
 ## 9. 30-Second Emergency Demo
@@ -95,7 +106,7 @@ python main.py --target examples/calculator.py
 "TestFlow is an execution-guided unit test orchestrator for Python. Instead of doing one-shot `Code -> LLM -> Tests`, it generates pytest tests, runs them, reads failures, repairs using traceback, measures coverage, and adds tests for uncovered behavior."
 
 ```bash
-python main.py --target examples/calculator.py
+python main.py --target examples/calculator.py --coverage-threshold 0.95 --max-iterations 12
 ```
 
 "The final report shows the actions taken, pass rate, coverage, and generated test file. That is the key idea: the orchestrator makes decisions from real runtime feedback."

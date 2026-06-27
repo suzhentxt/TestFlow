@@ -41,7 +41,7 @@ Generate -> Run -> Observe -> Repair -> Measure Coverage -> Generate More
 
 ## Live App
 
-App URL: https://<your-streamlit-subdomain>.streamlit.app
+App URL: https://testflow-uet.streamlit.app/
 
 The Streamlit app provides a visual demo of the execution-guided loop.
 
@@ -140,9 +140,10 @@ The graph is not fixed. It changes based on pytest failures, traceback, pass rat
   "target_file": "examples/calculator.py",
   "test_file": "generated_tests/test_calculator.py",
   "pass_rate": 1.0,
-  "coverage": 0.8333,
-  "total_tests": 9,
-  "passed": 9,
+  "coverage": 1.0,
+  "coverage_threshold": 0.95,
+  "total_tests": 37,
+  "passed": 37,
   "failed": 0,
   "errors": 0,
   "status": "success",
@@ -150,6 +151,9 @@ The graph is not fixed. It changes based on pytest failures, traceback, pass rat
     "analyze",
     "find_edge_cases",
     "generate_tests",
+    "run_tests",
+    "measure_coverage",
+    "generate_missing_tests",
     "run_tests",
     "measure_coverage",
     "verify_tests"
@@ -170,7 +174,13 @@ The graph is not fixed. It changes based on pytest failures, traceback, pass rat
     reason: tests need execution
 [4] tests_passed -> measure_coverage
     reason: tests pass but coverage not measured
-[5] coverage_measured -> verify_tests
+[5] coverage_measured -> generate_missing_tests
+    reason: coverage below threshold
+[6] missing_tests_generated -> run_tests
+    reason: tests need execution
+[7] tests_passed -> measure_coverage
+    reason: tests pass but coverage not measured
+[8] coverage_measured -> verify_tests
     reason: pass rate and coverage target reached
 ```
 
@@ -251,13 +261,13 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python main.py --target examples/calculator.py --coverage-threshold 0.8 --max-iterations 10
+python main.py --target examples/calculator.py --coverage-threshold 0.95 --max-iterations 12
 ```
 
 Backward-compatible alias:
 
 ```bash
-python main.py --target examples/calculator.py --coverage-target 0.8
+python main.py --target examples/calculator.py --coverage-target 0.95
 ```
 
 ## Example Output
@@ -279,15 +289,21 @@ Decision trace:
     reason: tests need execution
 [4] tests_passed -> measure_coverage
     reason: tests pass but coverage not measured
-[5] coverage_measured -> verify_tests
+[5] coverage_measured -> generate_missing_tests
+    reason: coverage below threshold
+[6] missing_tests_generated -> run_tests
+    reason: tests need execution
+[7] tests_passed -> measure_coverage
+    reason: tests pass but coverage not measured
+[8] coverage_measured -> verify_tests
     reason: pass rate and coverage target reached
 
 Final metrics:
 Pass rate: 100%
-Coverage: 83%
-Pytest: 9 passed, 0 failed, 0 errors, 9 total
+Coverage: 100%
+Pytest: 37 passed, 0 failed, 0 errors, 37 total
 Functions discovered: 5
-Iterations: 6/10
+Iterations: 9/12
 Status: success
 Stop reason: verified successfully
 ====================================

@@ -15,7 +15,7 @@ def test_state_defaults_actions_dict_and_summary():
     assert data["target_file"] == "src/calculator.py"
     assert data["module_name"] == "calculator"
     assert data["actions_taken"] == ["RunTests"]
-    assert data["coverage_target"] == 0.8
+    assert data["coverage_target"] == 0.95
 
     summary = state.summary_text()
 

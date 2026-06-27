@@ -31,9 +31,9 @@ def build_demo_result(target_file):
     }
 
 
-def build_live_result(target_file, max_iterations):
+def build_live_result(target_file, coverage_target, max_iterations):
     """Run the CLI and build live-run UI state without crashing the app."""
-    cli_result = run_testflow_cli(target_file)
+    cli_result = run_testflow_cli(target_file, coverage_target, max_iterations)
     summary = build_live_summary(target_file, cli_result, max_iterations)
     generated_path = generated_test_path(target_file)
     return {
@@ -150,9 +150,11 @@ def main():
     with st.sidebar:
         st.header("Run Settings")
         target_file = st.selectbox("Target file", TARGET_FILES)
-        st.slider("Coverage target", min_value=0.5, max_value=1.0, value=0.8, step=0.05)
+        coverage_target = st.slider(
+            "Coverage target", min_value=0.5, max_value=1.0, value=0.95, step=0.05
+        )
         max_iterations = st.number_input(
-            "Max iterations", min_value=1, max_value=10, value=3, step=1
+            "Max iterations", min_value=1, max_value=20, value=12, step=1
         )
         mode = st.radio("Mode", ["Demo Mode", "Live Run"])
         run_clicked = st.button("Run TestFlow", type="primary", use_container_width=True)
@@ -161,7 +163,7 @@ def main():
         if mode == "Demo Mode":
             result = build_demo_result(target_file)
         else:
-            result = build_live_result(target_file, int(max_iterations))
+            result = build_live_result(target_file, float(coverage_target), int(max_iterations))
         st.session_state["testflow_result"] = result
     elif "testflow_result" not in st.session_state:
         st.session_state["testflow_result"] = build_demo_result(target_file)

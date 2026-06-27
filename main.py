@@ -20,10 +20,10 @@ def main(argv: list[str] | None = None) -> int:
         "--coverage-target",
         dest="coverage_threshold",
         type=float,
-        default=0.8,
+        default=0.95,
         help="Target line coverage from 0.0 to 1.0.",
     )
-    parser.add_argument("--max-iterations", type=int, default=8, help="Maximum pytest iterations.")
+    parser.add_argument("--max-iterations", type=int, default=12, help="Maximum pytest iterations.")
     args = parser.parse_args(argv)
 
     target_path = Path(args.target).expanduser()

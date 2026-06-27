@@ -31,7 +31,7 @@ DEMO_SUMMARY = {
         "final_report",
     ],
     "pass_rate": 1.0,
-    "coverage": 0.84,
+    "coverage": 0.96,
     "iterations": 3,
     "repairs_triggered": 1,
     "generated_tests_count": 9,
@@ -198,7 +198,7 @@ def get_demo_summary(target_file):
     summary["target_file"] = target_file
     summary["functions"] = TARGET_FUNCTIONS.get(target_file, [])
     if target_file != CALCULATOR_TARGET:
-        summary["coverage"] = 0.81
+        summary["coverage"] = 0.96
         summary["generated_tests_count"] = 5
         summary["pytest_stdout"] = "5 passed in 0.31s"
     return summary
