@@ -219,7 +219,7 @@ class TestFlowOrchestrator:
                     "edge_count": len(graph["edges"]),
                 },
             ):
-                pass
+                _emit_graph_spans(graph)
 
             trace_output = state.to_summary_dict()
             update_current_trace(
@@ -575,6 +575,38 @@ def _trace_graph(state: TestFlowState) -> dict[str, Any]:
             for item in state.decision_trace
         ],
     }
+
+
+def _emit_graph_spans(graph: dict[str, Any]) -> None:
+    with trace_span(
+        "graph.mermaid",
+        output_data={"mermaid": graph.get("mermaid", "")},
+        metadata={"component": "orchestration-graph", "format": "mermaid"},
+    ):
+        pass
+
+    for transition in graph.get("timeline", []):
+        step = transition.get("step", 0)
+        source = transition.get("from") or "unknown"
+        action = transition.get("action") or "unknown"
+        target = transition.get("to") or "unknown"
+        reason = transition.get("reason") or ""
+        span_name = f"graph.edge.{int(step):02d} {source} -> {action} -> {target}"
+
+        with trace_span(
+            span_name,
+            input_data={"state": source},
+            output_data={"state": target},
+            metadata={
+                "component": "orchestration-graph",
+                "step": step,
+                "from": source,
+                "action": action,
+                "to": target,
+                "reason": reason,
+            },
+        ):
+            pass
 
 
 def _next_status_after(state: TestFlowState, step: int) -> str:

@@ -350,6 +350,8 @@ The `orchestrator.graph` span and final trace output include:
 - `graph.mermaid`: Mermaid text for the state/action graph
 - `graph.timeline`: compact `from -> action -> to` transitions
 
+Langfuse does not render Mermaid as a diagram automatically, so TestFlow also emits visible child spans named `graph.edge.00 ...`, `graph.edge.01 ...`, and so on under `orchestrator.graph`.
+
 The direct agent smoke script can exercise the OpenAI-backed generator:
 
 ```bash
