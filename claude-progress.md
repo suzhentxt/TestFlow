@@ -6,9 +6,9 @@
 - Product spec hiện tại: `README.md`
 - Đường dẫn khởi động/xác minh chuẩn trên Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1`
 - Đường dẫn khởi động/xác minh chuẩn trên Bash: `./init.sh`
-- Phạm vi baseline hiện tại: docs/process validation. Repo chưa có `pyproject.toml`, `src/testflow/`, hoặc `tests/`, nên baseline chưa chứng minh TestFlow CLI chạy được.
+- Phạm vi baseline hiện tại: process validation + `.venv` bootstrap + dependency install + pytest khi Python có sẵn. Repo đã có `testflow/state.py` và `tests/test_state.py`, nhưng chưa có `pyproject.toml` hoặc CLI.
 - Tính năng chưa hoàn thành có mức ưu tiên cao nhất sau tác vụ tài liệu: `tf-001` - Create installable Python CLI skeleton.
-- Sự cố chặn hiện tại: Bash không chạy trong sandbox Windows vì WSL chưa có distro. Dùng `init.ps1` trong môi trường hiện tại.
+- Sự cố chặn hiện tại: `.venv` chạy được trong môi trường Windows thật và baseline PowerShell pass khi chạy ngoài sandbox. Trong sandbox mặc định của Codex, `.venv` Python không truy cập được base interpreter dưới `C:\Users`. Bash không chạy trong sandbox Windows vì WSL chưa có distro.
 
 ## Nhật ký Phiên
 
@@ -47,4 +47,19 @@
   - Bash path chưa xác minh được trong sandbox hiện tại vì WSL chưa được cài distro.
   - Git trong sandbox cần `-c safe.directory=D:/TestFlow` hoặc cấu hình safe.directory ngoài repo.
   - Thay đổi tài liệu chưa được commit vì quyền ghi `.git` bị chặn.
-- Bước tốt nhất tiếp theo: triển khai `tf-001` bằng cách thêm `pyproject.toml`, `src/testflow/`, CLI entry point, smoke tests, rồi cập nhật `init.ps1`/`init.sh` để chạy pytest thật.
+- Bước tốt nhất tiếp theo: tiếp tục `tf-001` bằng cách thêm `pyproject.toml`, CLI entry point, và smoke tests; khi Codex cần chạy Python trong `.venv`, dùng approval ngoài sandbox vì base interpreter nằm dưới `C:\Users`.
+
+### Phiên 002 - 2026-06-27
+
+- Mục tiêu: Chuẩn hóa toàn bộ lệnh Python của repo để chạy qua `.venv`.
+- Đã hoàn thành:
+  - Cập nhật `init.ps1` để tạo `.venv` nếu thiếu, cài `requirements.txt`, cài package editable nếu có `pyproject.toml`, và chạy pytest bằng `.\.venv\Scripts\python.exe`.
+  - Cập nhật `init.sh` tương tự cho `.venv/bin/python` hoặc `.venv/Scripts/python.exe`.
+  - Cập nhật README development commands, AGENTS/CLAUDE rules, checklist, handoff, và feature baseline để không dùng Python/pip/pytest global ngoài bước bootstrap.
+- Xác minh đã chạy:
+  - `.\.venv\Scripts\python.exe -c "import sys; print(sys.executable); print(sys.prefix); print(sys.base_prefix)"` chạy ngoài sandbox -> xác nhận `.venv` dùng `D:\TestFlow\.venv` và base `C:\Users\hautt\AppData\Local\Programs\Python\Python310`.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1` chạy ngoài sandbox -> exit 0; cài dependencies trong `.venv`; `tests/test_state.py` pass.
+  - `bash ./init.sh` -> thất bại do WSL chưa có distro.
+- Blocker:
+  - Python trong `.venv` cần chạy ngoài sandbox nếu command cần truy cập base interpreter dưới `C:\Users`.
+  - Bash path vẫn cần WSL distro thật để xác minh.

@@ -24,6 +24,7 @@ Bạn đang làm việc trong repo TestFlow, một execution-guided unit test or
 - Không xóa hoặc làm yếu test chỉ để trạng thái có vẻ passing.
 - Không sửa production code khi nhiệm vụ chỉ là repair generated tests.
 - Sử dụng artifact repo như hệ thống ghi chép chính.
+- Tất cả lệnh Python, pip, pytest, và TestFlow phải chạy qua `.venv`; chỉ dùng Python global để bootstrap `.venv`.
 
 ## Tệp Bắt buộc
 

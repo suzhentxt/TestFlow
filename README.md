@@ -1105,29 +1105,58 @@ Mitigation:
 
 ## 20. Development Commands
 
-Install dependencies:
+Bootstrap the local virtual environment and run the standard checks:
 
 ```bash
-pip install -e .
-pip install pytest pytest-cov
+# Windows
+powershell -NoProfile -ExecutionPolicy Bypass -File ./init.ps1
+
+# Bash
+./init.sh
+```
+
+All project Python commands should run through `.venv`. Use global Python only to create `.venv`.
+
+Install dependencies manually when needed:
+
+```bash
+# Windows
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -e .
+
+# Bash
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .
 ```
 
 Run TestFlow:
 
 ```bash
-testflow run ./examples/calculator --target-coverage 85
+# Windows
+.\.venv\Scripts\testflow.exe run ./examples/calculator --target-coverage 85
+
+# Bash
+.venv/bin/testflow run ./examples/calculator --target-coverage 85
 ```
 
 Run internal tests:
 
 ```bash
-pytest tests/
+# Windows
+.\.venv\Scripts\python.exe -m pytest tests/
+
+# Bash
+.venv/bin/python -m pytest tests/
 ```
 
 Generate coverage:
 
 ```bash
-pytest --cov=src --cov-report=xml --cov-report=term-missing
+# Windows
+.\.venv\Scripts\python.exe -m pytest --cov=src --cov-report=xml --cov-report=term-missing
+
+# Bash
+.venv/bin/python -m pytest --cov=src --cov-report=xml --cov-report=term-missing
 ```
 
 ---

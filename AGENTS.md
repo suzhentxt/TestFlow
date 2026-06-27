@@ -26,6 +26,7 @@ Trước khi viết mã hoặc sửa tài liệu:
 - Không làm yếu kiểm tra hoặc thay đổi quy tắc xác minh ngầm trong lúc triển khai.
 - Ưu tiên artifact repo lâu bền hơn tóm tắt chat.
 - Khi repo chưa có implementation scaffold, chỉ được coi baseline là docs-only; không được tuyên bố TestFlow đã chạy thật.
+- Tất cả lệnh Python, pip, pytest, và TestFlow phải chạy qua `.venv`; chỉ dùng Python global để bootstrap `.venv`.
 
 ## Artifact Bắt buộc
 
