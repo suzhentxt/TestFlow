@@ -209,6 +209,7 @@ class TestFlowOrchestrator:
 
             graph = _trace_graph(state)
             graph["svg_path"] = _write_graph_svg(graph)
+            graph["png_path"] = _write_graph_png(graph)
             state.runtime_graph = graph
             with trace_span(
                 "orchestrator.graph",
@@ -580,17 +581,33 @@ def _trace_graph(state: TestFlowState) -> dict[str, Any]:
 
 
 def _emit_graph_spans(graph: dict[str, Any]) -> None:
-    svg_media = _langfuse_svg_media(graph.get("svg_path", ""))
-    image_output = {
-        "svg_path": graph.get("svg_path"),
-        "message": "Open this observation output/media to view the orchestration graph.",
+    png_media = _langfuse_image_media(graph.get("png_path", ""), "png")
+    png_output: Any = png_media or {
+        "png_path": graph.get("png_path"),
+        "message": "PNG graph was written locally, but Langfuse media upload was unavailable.",
     }
-    if svg_media is not None:
-        image_output["graph_svg"] = svg_media
+
+    with trace_span(
+        "graph.image.png",
+        output_data=png_output,
+        metadata={
+            "component": "orchestration-graph",
+            "format": "png",
+            "png_path": graph.get("png_path"),
+            "view_hint": "Open the output/media preview for this observation.",
+        },
+    ):
+        pass
+
+    svg_media = _langfuse_image_media(graph.get("svg_path", ""), "svg")
+    svg_output: Any = svg_media or {
+        "svg_path": graph.get("svg_path"),
+        "message": "SVG graph was written locally, but Langfuse media upload was unavailable.",
+    }
 
     with trace_span(
         "graph.image.svg",
-        output_data=image_output,
+        output_data=svg_output,
         metadata={
             "component": "orchestration-graph",
             "format": "svg",
@@ -687,6 +704,58 @@ def _write_graph_svg(graph: dict[str, Any]) -> str:
     return svg_path.as_posix()
 
 
+def _write_graph_png(graph: dict[str, Any]) -> str:
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except Exception:
+        return ""
+
+    timeline = graph.get("timeline", [])
+    width = 1120
+    row_height = 116
+    margin = 32
+    height = max(220, margin * 2 + max(1, len(timeline)) * row_height)
+    image = Image.new("RGB", (width, height), "#f8fafc")
+    draw = ImageDraw.Draw(image)
+    try:
+        title_font = ImageFont.truetype("Arial.ttf", 22)
+        label_font = ImageFont.truetype("Arial.ttf", 12)
+        value_font = ImageFont.truetype("Arial.ttf", 18)
+        small_font = ImageFont.truetype("Arial.ttf", 11)
+    except Exception:
+        title_font = label_font = value_font = small_font = ImageFont.load_default()
+
+    draw.text((34, 26), "TestFlow Runtime Orchestration Graph", fill="#0f172a", font=title_font)
+    draw.text(
+        (34, 54),
+        "State -> Planner Action -> Updated State, generated from the actual decision trace.",
+        fill="#475569",
+        font=label_font,
+    )
+
+    for index, transition in enumerate(timeline):
+        y = 84 + index * row_height
+        center_y = y + 29
+        step = transition.get("step", index)
+        source = str(transition.get("from") or "unknown")
+        action = str(transition.get("action") or "unknown")
+        target = str(transition.get("to") or "unknown")
+        reason = str(transition.get("reason") or "")
+
+        draw.text((34, y - 14), f"STEP {step}", fill="#64748b", font=label_font)
+        _png_box(draw, (34, y), "State", source, "#dbeafe", "#1d4ed8", label_font, value_font)
+        _png_arrow(draw, (334, center_y), (362, center_y), reason, small_font)
+        _png_box(draw, (380, y), "Planner Action", action, "#dcfce7", "#15803d", label_font, value_font)
+        _png_arrow(draw, (680, center_y), (726, center_y), "updates state", small_font)
+        _png_box(draw, (744, y), "Updated State", target, "#fef3c7", "#b45309", label_font, value_font)
+
+    output_dir = Path(".testflow")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    png_path = output_dir / "orchestration_graph.png"
+    image.save(png_path)
+    return png_path.as_posix()
+
+
 def _svg_box(x: int, y: int, width: int, height: int, label: str, value: str, fill: str, stroke: str) -> str:
     safe_label = escape(label)
     safe_value = escape(_shorten(value, 34))
@@ -717,8 +786,23 @@ def _shorten(value: str, max_chars: int) -> str:
     return value[: max_chars - 1] + "..."
 
 
-def _langfuse_svg_media(svg_path: str) -> Any | None:
-    if not svg_path:
+def _png_box(draw: Any, xy: tuple[int, int], label: str, value: str, fill: str, outline: str, label_font: Any, value_font: Any) -> None:
+    x, y = xy
+    draw.rounded_rectangle((x, y, x + 300, y + 58), radius=8, fill=fill, outline=outline, width=2)
+    draw.text((x + 16, y + 11), label, fill=outline, font=label_font)
+    draw.text((x + 16, y + 32), _shorten(value, 34), fill="#0f172a", font=value_font)
+
+
+def _png_arrow(draw: Any, start: tuple[int, int], end: tuple[int, int], label: str, font: Any) -> None:
+    x1, y1 = start
+    x2, y2 = end
+    draw.line((x1, y1, x2, y2), fill="#2563eb", width=2)
+    draw.polygon([(x2, y2), (x2 - 8, y2 - 5), (x2 - 8, y2 + 5)], fill="#2563eb")
+    draw.text((max(x1 - 8, 0), y1 - 17), _shorten(label, 30), fill="#334155", font=font)
+
+
+def _langfuse_image_media(path: str, image_type: str) -> Any | None:
+    if not path:
         return None
     try:
         from langfuse.api import MediaContentType
@@ -726,10 +810,15 @@ def _langfuse_svg_media(svg_path: str) -> Any | None:
     except Exception:
         return None
 
+    content_type = (
+        MediaContentType.IMAGE_PNG
+        if image_type == "png"
+        else MediaContentType.IMAGE_SVG_XML
+    )
     try:
         return LangfuseMedia(
-            file_path=svg_path,
-            content_type=MediaContentType.IMAGE_SVG_XML,
+            file_path=path,
+            content_type=content_type,
         )
     except Exception:
         return None

@@ -352,7 +352,7 @@ The `orchestrator.graph` span and final trace output include:
 
 Langfuse does not render Mermaid as a diagram automatically, so TestFlow also emits visible child spans named `graph.edge.00 ...`, `graph.edge.01 ...`, and so on under `orchestrator.graph`.
 
-For a visual graph, open the `graph.image.svg` observation output in Langfuse. The same SVG is also written locally to `.testflow/orchestration_graph.svg`.
+For a visual graph, open the `graph.image.png` observation output in Langfuse. The same PNG is also written locally to `.testflow/orchestration_graph.png`; SVG fallback is written to `.testflow/orchestration_graph.svg`.
 
 The direct agent smoke script can exercise the OpenAI-backed generator:
 
