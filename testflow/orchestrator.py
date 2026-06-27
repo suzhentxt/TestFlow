@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import re
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -207,6 +208,7 @@ class TestFlowOrchestrator:
                     break
 
             graph = _trace_graph(state)
+            graph["svg_path"] = _write_graph_svg(graph)
             state.runtime_graph = graph
             with trace_span(
                 "orchestrator.graph",
@@ -578,6 +580,25 @@ def _trace_graph(state: TestFlowState) -> dict[str, Any]:
 
 
 def _emit_graph_spans(graph: dict[str, Any]) -> None:
+    svg_media = _langfuse_svg_media(graph.get("svg_path", ""))
+    image_output = {
+        "svg_path": graph.get("svg_path"),
+        "message": "Open this observation output/media to view the orchestration graph.",
+    }
+    if svg_media is not None:
+        image_output["graph_svg"] = svg_media
+
+    with trace_span(
+        "graph.image.svg",
+        output_data=image_output,
+        metadata={
+            "component": "orchestration-graph",
+            "format": "svg",
+            "svg_path": graph.get("svg_path"),
+        },
+    ):
+        pass
+
     with trace_span(
         "graph.mermaid",
         output_data={"mermaid": graph.get("mermaid", "")},
@@ -607,6 +628,111 @@ def _emit_graph_spans(graph: dict[str, Any]) -> None:
             },
         ):
             pass
+
+
+def _write_graph_svg(graph: dict[str, Any]) -> str:
+    timeline = graph.get("timeline", [])
+    width = 1120
+    row_height = 116
+    margin = 32
+    height = max(220, margin * 2 + max(1, len(timeline)) * row_height)
+    state_x = 34
+    action_x = 380
+    next_x = 744
+    box_h = 58
+    box_w = 300
+    action_w = 300
+
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+            f'viewBox="0 0 {width} {height}" role="img">'
+        ),
+        "<defs>",
+        '<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">',
+        '<path d="M0,0 L0,6 L9,3 z" fill="#2563eb" />',
+        "</marker>",
+        "</defs>",
+        '<rect width="100%" height="100%" fill="#f8fafc" />',
+        '<text x="34" y="34" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#0f172a">TestFlow Runtime Orchestration Graph</text>',
+        '<text x="34" y="58" font-family="Inter,Arial,sans-serif" font-size="13" fill="#475569">State -> Planner Action -> Updated State, generated from the actual decision trace.</text>',
+    ]
+
+    for index, transition in enumerate(timeline):
+        y = 84 + index * row_height
+        center_y = y + box_h / 2
+        step = transition.get("step", index)
+        source = str(transition.get("from") or "unknown")
+        action = str(transition.get("action") or "unknown")
+        target = str(transition.get("to") or "unknown")
+        reason = str(transition.get("reason") or "")
+
+        parts.extend(
+            [
+                f'<text x="{state_x}" y="{y - 10}" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#64748b">STEP {escape(str(step))}</text>',
+                _svg_box(state_x, y, box_w, box_h, "State", source, "#dbeafe", "#1d4ed8"),
+                _svg_arrow(state_x + box_w, center_y, action_x - 18, center_y, reason),
+                _svg_box(action_x, y, action_w, box_h, "Planner Action", action, "#dcfce7", "#15803d"),
+                _svg_arrow(action_x + action_w, center_y, next_x - 18, center_y, "updates state"),
+                _svg_box(next_x, y, box_w, box_h, "Updated State", target, "#fef3c7", "#b45309"),
+            ]
+        )
+
+    parts.append("</svg>")
+    output_dir = Path(".testflow")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    svg_path = output_dir / "orchestration_graph.svg"
+    svg_path.write_text("\n".join(parts), encoding="utf-8")
+    return svg_path.as_posix()
+
+
+def _svg_box(x: int, y: int, width: int, height: int, label: str, value: str, fill: str, stroke: str) -> str:
+    safe_label = escape(label)
+    safe_value = escape(_shorten(value, 34))
+    return "\n".join(
+        [
+            f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="8" fill="{fill}" stroke="{stroke}" stroke-width="1.5" />',
+            f'<text x="{x + 16}" y="{y + 22}" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700" fill="{stroke}">{safe_label}</text>',
+            f'<text x="{x + 16}" y="{y + 43}" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="700" fill="#0f172a">{safe_value}</text>',
+        ]
+    )
+
+
+def _svg_arrow(x1: float, y1: float, x2: float, y2: float, label: str) -> str:
+    safe_label = escape(_shorten(label, 30))
+    label_x = (x1 + x2) / 2 - 72
+    label_y = y1 - 8
+    return "\n".join(
+        [
+            f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />',
+            f'<text x="{label_x}" y="{label_y}" font-family="Inter,Arial,sans-serif" font-size="11" fill="#334155">{safe_label}</text>',
+        ]
+    )
+
+
+def _shorten(value: str, max_chars: int) -> str:
+    if len(value) <= max_chars:
+        return value
+    return value[: max_chars - 1] + "..."
+
+
+def _langfuse_svg_media(svg_path: str) -> Any | None:
+    if not svg_path:
+        return None
+    try:
+        from langfuse.api import MediaContentType
+        from langfuse.media import LangfuseMedia
+    except Exception:
+        return None
+
+    try:
+        return LangfuseMedia(
+            file_path=svg_path,
+            content_type=MediaContentType.IMAGE_SVG_XML,
+        )
+    except Exception:
+        return None
 
 
 def _next_status_after(state: TestFlowState, step: int) -> str:
